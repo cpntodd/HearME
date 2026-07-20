@@ -317,6 +317,59 @@ const App = {
                 document.getElementById('status-text').textContent = 'Graph cleared.';
             }
         });
+
+        // Import from Jellyfin library
+        document.getElementById('btn-import-library').addEventListener('click', () => {
+            this._importFromLibrary();
+        });
+    },
+
+    async _importFromLibrary() {
+        const btn = document.getElementById('btn-import-library');
+        const orig = btn.textContent;
+        btn.textContent = '⏳ Loading...';
+        btn.disabled = true;
+        try {
+            const resp = await fetch('/api/jellyfin/library/artists');
+            const data = await resp.json();
+            if (!data || data.length === 0) {
+                Components.toast('No artists found in Jellyfin library.', 'info');
+                return;
+            }
+            let imported = 0;
+            for (const artist of data) {
+                if (Graph.nodes.length >= Graph.maxNodes) {
+                    Components.toast(`Node limit reached (${Graph.maxNodes}). Imported ${imported} artists.`, 'warn');
+                    break;
+                }
+                const exists = Graph.nodes.find(n =>
+                    n.artist.name.toLowerCase() === artist.name.toLowerCase()
+                );
+                if (!exists) {
+                    Graph.addNode(artist);
+                    Store.addArtist(artist);
+                    imported++;
+                }
+            }
+            if (imported > 0) {
+                this._updateArtistList();
+                Components.toast(`Imported ${imported} artists from library.`, 'info');
+                // Auto-expand first 3 to seed the graph
+                const toExpand = Graph.nodes.filter(n => !n.expanded).slice(0, 3);
+                for (const node of toExpand) {
+                    await this._expandArtist(node.artist);
+                }
+                // Refresh tour grid with library artists
+                if (Grid && Grid.refresh) Grid.refresh();
+            } else {
+                Components.toast('All library artists already in graph.', 'info');
+            }
+        } catch (err) {
+            Components.toast('Failed to import from library.', 'error');
+        } finally {
+            btn.textContent = orig;
+            btn.disabled = false;
+        }
     },
 
     _bindDetailPanel() {
