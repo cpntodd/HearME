@@ -22,6 +22,10 @@ type Config struct {
 	// Artist providers
 	LastFMAPIKey string
 
+	// Jellyfin
+	JellyfinURL    string
+	JellyfinAPIKey string
+
 	// RSS scraper
 	ScraperEnabled  bool
 	ScraperInterval time.Duration
@@ -37,6 +41,8 @@ func Load() *Config {
 		SongkickAPIKey:   getEnvStr("HEARME_SONGKICK_API_KEY", ""),
 		TicketmasterKey:  getEnvStr("HEARME_TICKETMASTER_API_KEY", ""),
 		LastFMAPIKey:     getEnvStr("HEARME_LASTFM_API_KEY", ""),
+		JellyfinURL:      getEnvStr("HEARME_JELLYFIN_URL", ""),
+		JellyfinAPIKey:   getEnvStr("HEARME_JELLYFIN_API_KEY", ""),
 		ScraperEnabled:   getEnvBool("HEARME_SCRAPER_ENABLED", true),
 		ScraperInterval:  getEnvDuration("HEARME_SCRAPER_INTERVAL", 30*time.Minute),
 	}

@@ -461,6 +461,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				"musicbrainz":  true,
 				"lastfm":       s.cfg.LastFMAPIKey != "",
 			},
+			"jellyfin": map[string]any{
+				"url":   s.cfg.JellyfinURL,
+				"hasKey": s.cfg.JellyfinAPIKey != "",
+			},
 			"scraper": map[string]any{
 				"enabled":  s.cfg.ScraperEnabled,
 				"interval": s.cfg.ScraperInterval.String(),
@@ -478,6 +482,8 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			BandsintownKey  *string `json:"bandsintownKey"`
 			SongkickKey     *string `json:"songkickKey"`
 			TicketmasterKey *string `json:"ticketmasterKey"`
+			JellyfinURL     *string `json:"jellyfinUrl"`
+			JellyfinKey     *string `json:"jellyfinKey"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			s.writeJSONError(w, http.StatusBadRequest, "invalid request body")
@@ -516,6 +522,14 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if req.TicketmasterKey != nil {
 			s.cfg.TicketmasterKey = *req.TicketmasterKey
 			reconfigure = true
+		}
+
+		// Jellyfin settings (no provider reconfiguration needed — just config)
+		if req.JellyfinURL != nil {
+			s.cfg.JellyfinURL = *req.JellyfinURL
+		}
+		if req.JellyfinKey != nil {
+			s.cfg.JellyfinAPIKey = *req.JellyfinKey
 		}
 
 		if reconfigure {

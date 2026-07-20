@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/css/winamp.css">
 </head>
 <body>
-    <div id="app-wrapper" style="transform-origin:0 0">
+    <div id="app-wrapper" style="transform-origin:0 0;width:100%;height:100vh;overflow:hidden">
     <!-- Title Bar -->
     <div class="window" id="app-window">
         <div class="titlebar" id="titlebar">
@@ -179,7 +179,6 @@
                                     </div>
                                     <div id="detail-discography" class="detail-discography-grid"></div>
                                 </div>
-                                </div>
                             </div>
                         </div>
                     </div>
@@ -277,6 +276,21 @@
                             </div>
                             <button id="btn-save-keys" class="btn">Save API Keys</button>
                             <span id="setting-save-status" class="setting-status"></span>
+                        </div>
+                    </div>
+                    <div class="panel inset">
+                        <div class="panel-header">Jellyfin</div>
+                        <div class="panel-body settings-body">
+                            <div class="setting-field">
+                                <label class="setting-label">Server URL</label>
+                                <input type="text" id="setting-jellyfin-url" class="input" placeholder="http://localhost:8096">
+                            </div>
+                            <div class="setting-field">
+                                <label class="setting-label">API Key</label>
+                                <input type="password" id="setting-jellyfin-key" class="input" placeholder="Dashboard > API Keys">
+                            </div>
+                            <button id="btn-save-jellyfin" class="btn">Save Jellyfin</button>
+                            <span id="setting-jellyfin-status" class="setting-status"></span>
                         </div>
                     </div>
                     <div class="panel inset">

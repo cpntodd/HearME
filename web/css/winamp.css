@@ -58,7 +58,7 @@ html, body {
 .window {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    height: 100%;
     background: var(--bg);
 }
 
@@ -199,7 +199,7 @@ html, body {
     display: none;
     position: absolute;
     inset: 0;
-    overflow: auto;
+    overflow: hidden;
 }
 
 .view.active {
@@ -1125,14 +1125,21 @@ html, body {
 #view-settings {
     padding: 8px;
     overflow-y: auto;
+    flex-direction: column;
 }
 
 .settings-container {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    grid-auto-flow: row dense;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 8px;
     align-items: start;
+    width: 100%;
+}
+
+.settings-container > .panel {
+    min-width: 0;
+    overflow: hidden;
+    margin: 0;
 }
 
 .settings-body {

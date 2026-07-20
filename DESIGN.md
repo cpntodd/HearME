@@ -141,32 +141,39 @@ HEARME_SCRAPER_INTERVAL=30m
 |--------|------|-------------|
 | `GET` | `/api/health` | Health check |
 | `POST` | `/api/tours` | Get upcoming tours for a list of artist names |
-| `GET` | `/api/artists/:name` | Get artist metadata (genres, bio, image) |
+| `GET` | `/api/artists/:name` | Get artist metadata (genres, bio, image from all providers) |
+| `GET` | `/api/artists/:name/discography` | Get discography (albums, EPs, singles, live, compilations) |
+| `GET` | `/api/albums/:artist/:album` | Get album detail with tracklist |
+| `GET` | `/api/lyrics/:artist/:title` | Get song lyrics from Lyrics.ovh |
 | `GET` | `/api/graph/expand/:name` | Get related artists for graph expansion |
-| `POST` | `/api/graph/batch` | Batch expand multiple artists |
+| `GET` | `/api/image?url=...` | Image proxy to bypass Cover Art Archive ORB/CORS blocking |
 | `GET` | `/api/scraper/feeds/:name` | Discover RSS feeds for an artist |
 | `POST` | `/api/scraper/tours/:name` | Get scraped tours for an artist |
+| `GET` | `/api/settings` | Get current server-side settings and provider status |
+| `POST` | `/api/settings` | Update API keys (reconfigures providers live) |
+| `POST` | `/api/cache/clear` | Clear server-side cache |
 
 ### Provider Interface
 
 ```go
-// TourProvider is implemented by each tour data source.
 type TourProvider interface {
     Name() string
     Enabled() bool
     GetTours(ctx context.Context, artistNames []string) ([]Tour, error)
 }
 
-// ArtistProvider is implemented by each artist relationship source.
 type ArtistProvider interface {
     Name() string
     Enabled() bool
+    Search(ctx context.Context, query string) ([]ArtistMatch, error)
     GetRelated(ctx context.Context, artistName string, depth int) ([]ArtistRelation, error)
     GetMetadata(ctx context.Context, artistName string) (*ArtistMetadata, error)
+    GetDiscography(ctx context.Context, artistName string) ([]Release, error)
+    GetAlbumInfo(ctx context.Context, artistName, albumName string) (*AlbumDetail, error)
 }
 ```
 
-The aggregator fans out requests to all enabled providers concurrently, merges results, and deduplicates.
+The aggregator fans out requests to all enabled providers concurrently, merges results, and deduplicates. GetMetadata merges bios from Last.fm with genres from all sources. GetDiscography deduplicates by title + release type and sorts by year descending.
 
 ### Caching
 
@@ -208,30 +215,65 @@ When a user adds an artist, the scraper attempts to discover feeds:
 
 ### Technology
 
-- **Vanilla JavaScript (ES2020+).** No transpiler needed — modern browsers support ES modules, arrow functions, `async/await`, `fetch`, `class`, template literals.
-- **Custom CSS.** No Tailwind, no Bootstrap, no 98.css. Every pixel is intentional.
-- **Canvas 2D API** for the node graph.
+- **Vanilla JavaScript (ES2020+).** No transpiler needed — modern browsers support classes, arrow functions, `async/await`, `fetch`, template literals.
+- **Web Audio API** for the audio player — `AudioContext`, `AnalyserNode`, `ChannelSplitter`, `GainNode`.
+- **Canvas 2D API** for the node graph AND audio visualizer (6 presets), VFD display, and VU meters.
+- **Custom CSS.** No Tailwind, no Bootstrap, no 98.css. Every pixel is intentional (~1k lines of hand-crafted retro theme).
 - **CSS Grid + Flexbox** for layout.
+- **localStorage** for all client-side persistence (artists, settings, cached tours).
+- **UI scaling** via `transform: scale()` on `#app-wrapper` + inverse percentage sizing. Font scaling via injected `<style>` with `!important` overrides.
 
 ### Views (Tabs)
 
-The app has a Winamp-style tab bar at the top:
+The app has a Winamp-style tab bar with four views:
 
 ```
-┌──────────────────────────────────────────────────┐
-│  [Graph Explorer]  [Tour Grid]  [Settings]        │  ← Tab bar (Winamp tabs)
-├──────────────────────────────────────────────────┤
-│                                                    │
-│  Main content area (switches per tab)              │
-│                                                    │
-├──────────────────────────────────────────────────┤
-│  Status bar: "12 artists • 47 upcoming tours • ... │
-└──────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│  [Player]  [Graph Explorer]  [Tour Grid]  [Settings]      │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  Main content area (switches per tab, only one visible)   │
+│                                                           │
+├──────────────────────────────────────────────────────────┤
+│  Status bar: "Ready • 0 nodes • MusicBrainz"              │
+└──────────────────────────────────────────────────────────┘
 ```
 
----
+### View 0: Audio Player (Default)
 
-### View 1: Graph Explorer (The Hybrid)
+**Layout:**
+```
+┌──────────┬───────────────────────────────┬──────────────┐
+│ Album Art │  Visualizer Canvas             │  Playlist     │
+│ Track Info│  (Canvas 2D, ~60fps)           │  Queue        │
+│           │                                │               │
+│ 💿        │  ┌─── VFD Display ───┐         │  • Track 1    │
+│ No Track  │  │ NOW PLAYING...    │         │  • Track 2    │
+│ —         │  └──────────────────┘         │  • Track 3    │
+│ —         │  [VU L] [VU R]                │               │
+│           │  Spectrum Wave Rad... │         │               │
+├──────────┴───────────────────────────────┴──────────────┤
+│ 🔀 ⏮ ▶ ⏭ 🔁  ━━━━━━●━━━━━━ 0:00   🔊 ━━━●━━ 🎚        │
+└──────────────────────────────────────────────────────────┘
+```
+
+**Features:**
+- **Web Audio API engine:** `AudioContext` → `MediaElementSource` → `AnalyserNode` (2048 FFT) → `ChannelSplitter` → stereo `GainNode`.
+- **6 visualizer presets** rendered on Canvas 2D at ~60fps:
+  1. **Spectrum** — classic frequency bars with gradient fill.
+  2. **Oscilloscope** — green waveform tracing.
+  3. **Circular** — radial bars emanating from center.
+  4. **Particles** — particle swarm reacting to frequency bands.
+  5. **Fire** — flame simulation driven by low/mid frequencies.
+  6. **Bars+Beads** — bar chart with bouncing bead on peak.
+- **VFD Display:** Canvas-rendered dot-matrix Vacuum Fluorescent Display with scrolling track info text.
+- **VU Meters:** Dual-channel analog-style needle meters with dB scale (-60 to +3 dB) and peak hold indicators.
+- **Transport controls:** Play/Pause, Previous, Next, Shuffle, Repeat (off/all/one).
+- **Seek bar** with current/total time display.
+- **Volume slider** controlling GainNode.
+- **Playlist panel** — tracks queued from Jellyfin library.
+
+### View 1: Graph Explorer
 
 **Layout:**
 

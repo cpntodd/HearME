@@ -257,17 +257,21 @@ func deduplicateRelations(rels []models.ArtistRelation) []models.ArtistRelation 
 	var result []models.ArtistRelation
 
 	for _, r := range rels {
-		// Deduplicate by ID first, then by case-insensitive name
+		// Normalize name for dedup: lowercase, strip parentheticals,
+		// strip leading/trailing whitespace, collapse multiple spaces
+		normName := normalizeName(r.Artist.Name)
+
+		// Deduplicate by ID first, then by normalized name
 		key := r.Artist.ID
 		if key == "" {
-			key = strings.ToLower(r.Artist.Name)
+			key = normName
 		}
 		if seen[key] {
 			// Already have this artist — keep the one with the higher score
 			for i, existing := range result {
 				existingKey := existing.Artist.ID
 				if existingKey == "" {
-					existingKey = strings.ToLower(existing.Artist.Name)
+					existingKey = normalizeName(existing.Artist.Name)
 				}
 				if existingKey == key && r.Score > existing.Score {
 					result[i] = r
@@ -277,13 +281,30 @@ func deduplicateRelations(rels []models.ArtistRelation) []models.ArtistRelation 
 		}
 		seen[key] = true
 
-		// Also mark the lowercased name as seen to catch cross-provider duplicates
-		nameKey := strings.ToLower(r.Artist.Name)
-		if nameKey != key {
-			seen[nameKey] = true
+		// Also mark the normalized name as seen to catch cross-provider duplicates
+		// (different IDs but same normalized name = same artist)
+		if normName != key {
+			// Check if any existing result has this normalized name
+			foundSimilar := false
+			for i, existing := range result {
+				if normalizeName(existing.Artist.Name) == normName {
+					foundSimilar = true
+					if r.Score > existing.Score {
+						result[i] = r
+					}
+					break
+				}
+			}
+			if !foundSimilar {
+				seen[normName] = true
+				result = append(result, r)
+			}
+		} else {
+			result = append(result, r)
 		}
 
-		result = append(result, r)
+		// Also mark normalized name in seen
+		seen[normName] = true
 	}
 
 	// Sort by score descending, then by name
@@ -315,4 +336,73 @@ func sanitizeID(s string) string {
 		}
 	}
 	return string(b)
+}
+
+// normalizeName produces a canonical lowercase form of an artist name for deduplication.
+// Strips: parenthetical disambiguators "(band)", "(musician)", etc.
+// Strips: leading "the ", "a "
+// Collapses whitespace.
+func normalizeName(name string) string {
+	s := strings.ToLower(name)
+
+	// Remove parenthetical disambiguators: "(band)", "(musician)", "(us)", "(uk)", "(group)", etc.
+	// Also handles nested parens by stripping everything from first '(' to matching ')'.
+	for {
+		start := strings.Index(s, "(")
+		if start == -1 {
+			break
+		}
+		end := strings.Index(s[start:], ")")
+		if end == -1 {
+			break
+		}
+		end += start
+		// Only strip if the content looks like a disambiguator (short, common words)
+		content := strings.TrimSpace(s[start+1 : end])
+		content = strings.ToLower(content)
+		if isDisambiguator(content) {
+			s = strings.TrimSpace(s[:start] + s[end+1:])
+		} else {
+			// Not a disambiguator — keep it but skip past this paren pair
+			s = strings.TrimSpace(s[:start] + s[end+1:])
+		}
+	}
+
+	// Strip leading articles
+	s = strings.TrimPrefix(s, "the ")
+	s = strings.TrimPrefix(s, "a ")
+
+	// Collapse multiple consecutive spaces
+	for strings.Contains(s, "  ") {
+		s = strings.ReplaceAll(s, "  ", " ")
+	}
+
+	// Strip trailing punctuation
+	s = strings.TrimRight(s, ",.!;:'\"")
+
+	return strings.TrimSpace(s)
+}
+
+// isDisambiguator returns true if the parenthetical content looks like
+// a MusicBrainz-style disambiguator rather than part of the artist name.
+func isDisambiguator(s string) bool {
+	disambiguators := []string{
+		"band", "group", "musician", "artist", "singer", "rapper",
+		"dj", "producer", "duo", "trio", "quartet",
+		"us", "usa", "uk", "gb", "de", "fr", "jp", "au", "ca", "nz",
+		"american", "british", "german", "french", "japanese", "australian", "canadian",
+		"metal", "rock", "pop", "punk", "indie", "electronic",
+		"composer", "songwriter", "guitarist", "drummer", "bassist", "pianist",
+		"orchestra", "ensemble", "choir", "chorus",
+	}
+	for _, d := range disambiguators {
+		if s == d {
+			return true
+		}
+	}
+	// Also match simple location/year patterns like "los angeles", "2001"
+	if len(s) <= 20 {
+		return true
+	}
+	return false
 }

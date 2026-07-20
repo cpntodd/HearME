@@ -774,6 +774,72 @@ const App = {
             }
         });
 
+        // API Keys save
+        document.getElementById('btn-save-keys').addEventListener('click', async () => {
+            const body = {};
+            const lastfmKey = document.getElementById('setting-lastfm-key').value.trim();
+            const bandsintownKey = document.getElementById('setting-bandsintown-key').value.trim();
+            const songkickKey = document.getElementById('setting-songkick-key').value.trim();
+            const ticketmasterKey = document.getElementById('setting-ticketmaster-key').value.trim();
+            if (lastfmKey) body.lastfmKey = lastfmKey;
+            if (bandsintownKey) body.bandsintownKey = bandsintownKey;
+            if (songkickKey) body.songkickKey = songkickKey;
+            if (ticketmasterKey) body.ticketmasterKey = ticketmasterKey;
+            if (Object.keys(body).length === 0) {
+                Components.toast('No keys to save.', 'info');
+                return;
+            }
+            try {
+                const resp = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (resp.ok) {
+                    Components.toast('API keys saved.', 'info');
+                    document.getElementById('setting-save-status').textContent = '✓ Saved';
+                    setTimeout(() => { document.getElementById('setting-save-status').textContent = ''; }, 2000);
+                    // Reload settings to update provider checkboxes
+                    this._loadSettings();
+                } else {
+                    Components.toast('Failed to save keys.', 'error');
+                }
+            } catch {
+                Components.toast('Failed to save keys.', 'error');
+            }
+        });
+
+        // Jellyfin save
+        document.getElementById('btn-save-jellyfin').addEventListener('click', async () => {
+            const body = {};
+            const url = document.getElementById('setting-jellyfin-url').value.trim();
+            const key = document.getElementById('setting-jellyfin-key').value.trim();
+            if (url) body.jellyfinUrl = url;
+            if (key) body.jellyfinKey = key;
+            if (Object.keys(body).length === 0) {
+                Components.toast('No Jellyfin settings to save.', 'info');
+                return;
+            }
+            try {
+                const resp = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body),
+                });
+                if (resp.ok) {
+                    Components.toast('Jellyfin settings saved.', 'info');
+                    document.getElementById('setting-jellyfin-status').textContent = '✓ Saved';
+                    document.getElementById('setting-jellyfin-key').value = '';
+                    document.getElementById('setting-jellyfin-key').placeholder = '(saved)';
+                    setTimeout(() => { document.getElementById('setting-jellyfin-status').textContent = ''; }, 2000);
+                } else {
+                    Components.toast('Failed to save Jellyfin settings.', 'error');
+                }
+            } catch {
+                Components.toast('Failed to save Jellyfin settings.', 'error');
+            }
+        });
+
         // Scraper toggle
         document.getElementById('setting-scraper').addEventListener('change', async (e) => {
             try {
@@ -800,6 +866,10 @@ const App = {
             document.getElementById('setting-ticketmaster').checked = providers.ticketmaster || false;
             document.getElementById('setting-lastfm').checked = providers.lastfm || false;
             document.getElementById('setting-scraper').checked = (data.scraper && data.scraper.enabled) || false;
+            // Jellyfin
+            const jf = data.jellyfin || {};
+            document.getElementById('setting-jellyfin-url').value = jf.url || '';
+            document.getElementById('setting-jellyfin-key').placeholder = jf.hasKey ? '(saved)' : 'Dashboard > API Keys';
             // Update cache info
             const cacheEntries = (data.cache && data.cache.entries) || 0;
             document.getElementById('status-text').textContent =
