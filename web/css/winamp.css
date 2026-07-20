@@ -1218,6 +1218,21 @@ html, body {
     color: var(--text);
 }
 
+.setting-checkbox {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    margin: 4px 0;
+}
+
+.setting-checkbox input[type="checkbox"] {
+    accent-color: var(--accent);
+    cursor: pointer;
+}
+
 .setting-stepper {
     display: flex;
     align-items: center;

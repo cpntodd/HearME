@@ -1222,6 +1222,10 @@ const App = {
         // Graph settings
         document.getElementById('setting-max-nodes').addEventListener('change', () => this._saveGraphSettings());
         document.getElementById('setting-auto-expand').addEventListener('change', () => this._saveGraphSettings());
+        document.getElementById('setting-center-gravity').addEventListener('change', () => {
+            Graph.centerGravityEnabled = document.getElementById('setting-center-gravity').checked;
+            this._saveGraphSettings();
+        });
         this._loadGraphSettings();
     },
 
@@ -1229,12 +1233,16 @@ const App = {
         const s = Store.getSettings();
         document.getElementById('setting-max-nodes').value = s.maxGraphNodes || 500;
         document.getElementById('setting-auto-expand').value = s.autoExpandCount || 5;
+        const cg = document.getElementById('setting-center-gravity');
+        cg.checked = s.centerGravity === true;
+        Graph.centerGravityEnabled = cg.checked;
     },
 
     _saveGraphSettings() {
         const s = Store.getSettings();
         s.maxGraphNodes = parseInt(document.getElementById('setting-max-nodes').value) || 0;
         s.autoExpandCount = parseInt(document.getElementById('setting-auto-expand').value) || 5;
+        s.centerGravity = document.getElementById('setting-center-gravity').checked;
         Store.setSettings(s);
         Components.toast('Graph settings saved.', 'info');
     },

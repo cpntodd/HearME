@@ -28,12 +28,13 @@ const Graph = {
     attraction: 0.01,
     idealEdgeLength: 120,
     damping: 0.85,
-    centerGravity: 0.003,  // stronger center pull
-    orbitGravity: 0.008,   // pull connected nodes toward pinned hosts
-    orbitIdealDist: 100,   // ideal orbital distance from pinned node
+    centerGravity: 0.003,       // pull toward viewport center (only when enabled)
+    centerGravityEnabled: false, // toggle via settings — default OFF so nodes don't clump
+    orbitGravity: 0.008,        // pull connected nodes toward pinned hosts
+    orbitIdealDist: 100,        // ideal orbital distance from pinned node
     maxVelocity: 10,
-    dragScale: 1.15,       // scale up when dragging
-    wiggleTime: 0,         // for edge wiggle animation
+    dragScale: 1.15,            // scale up when dragging
+    wiggleTime: 0,              // for edge wiggle animation
 
     // Genre color map
     genreColors: {},
@@ -300,18 +301,20 @@ const Graph = {
             }
         }
 
-        // Center gravity (only for unpinned nodes)
-        const cw = Math.max(this.canvas.width, 1);
-        const ch = Math.max(this.canvas.height, 1);
-        const cx = cw / 2 / this.transform.scale - this.transform.x / this.transform.scale;
-        const cy = ch / 2 / this.transform.scale - this.transform.y / this.transform.scale;
-        for (const node of nodes) {
-            if (node.pinned) continue;
-            // Guard against NaN positions
-            if (isNaN(node.x)) node.x = cx + (Math.random() - 0.5) * 100;
-            if (isNaN(node.y)) node.y = cy + (Math.random() - 0.5) * 100;
-            node.vx += (cx - node.x) * this.centerGravity;
-            node.vy += (cy - node.y) * this.centerGravity;
+        // Center gravity (only for unpinned nodes, only when enabled)
+        if (this.centerGravityEnabled) {
+            const cw = Math.max(this.canvas.width, 1);
+            const ch = Math.max(this.canvas.height, 1);
+            const cx = cw / 2 / this.transform.scale - this.transform.x / this.transform.scale;
+            const cy = ch / 2 / this.transform.scale - this.transform.y / this.transform.scale;
+            for (const node of nodes) {
+                if (node.pinned) continue;
+                // Guard against NaN positions
+                if (isNaN(node.x)) node.x = cx + (Math.random() - 0.5) * 100;
+                if (isNaN(node.y)) node.y = cy + (Math.random() - 0.5) * 100;
+                node.vx += (cx - node.x) * this.centerGravity;
+                node.vy += (cy - node.y) * this.centerGravity;
+            }
         }
 
         // Apply velocities with damping and clamp (only for unpinned nodes)
