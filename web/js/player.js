@@ -80,14 +80,22 @@ const Player = {
             bands.style.display = bands.style.display === 'none' ? 'flex' : 'none';
         });
 
-        // Visualizer presets
-        document.querySelectorAll('#view-player .detail-filter-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('#view-player .detail-filter-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                this.preset = tab.dataset.preset;
+        // Visualizer context menu (right-click on visualizer canvas)
+        const vizCanvas = document.getElementById('player-visualizer');
+        const vizMenu = document.getElementById('visualizer-context-menu');
+        vizCanvas.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            vizMenu.style.left = e.clientX + 'px';
+            vizMenu.style.top = e.clientY + 'px';
+            vizMenu.classList.remove('hidden');
+        });
+        vizMenu.querySelectorAll('.context-menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                this.preset = item.dataset.preset;
+                vizMenu.classList.add('hidden');
             });
         });
+        document.addEventListener('click', () => vizMenu.classList.add('hidden'));
 
         // Start VFD + VU render loop
         this._renderDisplays();
@@ -309,9 +317,9 @@ const Player = {
     },
 
     _updatePlaylistUI() {
-        const el = document.getElementById('player-playlist');
+        const el = document.getElementById('now-playing-list');
         if (this.playlist.length === 0) {
-            el.innerHTML = '<div class="player-playlist-empty">Queue is empty.<br>Browse Jellyfin to add tracks.</div>';
+            el.innerHTML = '<div class="player-playlist-empty">Queue is empty.<br>Browse your library to add tracks.</div>';
             return;
         }
         el.innerHTML = this.playlist.map((t, i) => `
@@ -753,148 +761,114 @@ const Player = {
     // ====================================================================
 
     _initLibrary() {
-        // Right panel tab switching
-        document.querySelectorAll('.player-right-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                document.querySelectorAll('.player-right-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                const panelId = 'panel-' + tab.dataset.panel;
-                document.querySelectorAll('.player-right-panel').forEach(p => p.classList.remove('active'));
-                document.getElementById(panelId).classList.add('active');
-                if (tab.dataset.panel === 'library') {
-                    this._loadLibrary();
-                }
+        // Library sidebar navigation
+        document.querySelectorAll('.library-nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                document.querySelectorAll('.library-nav-item').forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+                const view = item.dataset.view;
+                this._libView = view;
+                this._loadLibraryView(view);
             });
         });
 
-        // Back button
-        document.getElementById('lib-back').addEventListener('click', () => this._libGoBack());
-
-        // Search filter
-        document.getElementById('lib-search').addEventListener('input', (e) => {
-            this._libFilter(e.target.value);
+        // Global search
+        const searchInput = document.getElementById('lib-search-input');
+        searchInput.addEventListener('input', (e) => {
+            const q = e.target.value.trim();
+            if (q.length >= 2) {
+                this._searchLibrary(q);
+            } else if (q.length === 0) {
+                this._loadLibraryView(this._libView || 'home');
+            }
         });
     },
 
-    async _loadLibrary() {
-        if (this._libView === 'artists' && !this._libArtistsCache) {
-            await this._loadArtists();
+    async _loadLibraryView(view) {
+        const content = document.getElementById('library-content');
+        content.innerHTML = '<div class="library-loading">Loading...</div>';
+
+        switch (view) {
+            case 'home':
+                // Home = recently added albums from Jellyfin
+                this._loadHome();
+                break;
+            case 'artists':
+                await this._loadArtists();
+                break;
+            case 'albums':
+                await this._loadAllAlbums();
+                break;
+            case 'tracks':
+                await this._loadAllTracks();
+                break;
+            case 'playlists':
+                this._renderPlaylists();
+                break;
         }
     },
 
-    _libGoBack() {
-        if (this._libView === 'albums') {
-            this._libView = 'artists';
-            this._libParentId = null;
-            this._libParentName = '';
-            document.getElementById('lib-breadcrumb').textContent = 'All Artists';
-            this._renderLibrary();
-        } else if (this._libView === 'tracks') {
-            this._libView = 'albums';
-            document.getElementById('lib-breadcrumb').textContent = this._libParentName;
-            this._renderAlbums(this._libAlbumsCache || []);
-        }
-    },
-
-    _libFilter(query) {
-        const q = query.toLowerCase();
-        const cards = document.querySelectorAll('.library-card');
-        const tracks = document.querySelectorAll('.library-track');
-        cards.forEach(c => {
-            const name = (c.querySelector('.library-card-name')?.textContent || '').toLowerCase();
-            const sub = (c.querySelector('.library-card-sub')?.textContent || '').toLowerCase();
-            c.style.display = (!q || name.includes(q) || sub.includes(q)) ? '' : 'none';
-        });
-        tracks.forEach(t => {
-            const title = (t.querySelector('.library-track-title')?.textContent || '').toLowerCase();
-            t.style.display = (!q || title.includes(q)) ? '' : 'none';
-        });
-    },
-
-    async _loadArtists() {
-        const content = document.getElementById('lib-content');
-        content.innerHTML = '<div class="library-loading">Loading artists...</div>';
+    async _loadHome() {
+        const content = document.getElementById('library-content');
         try {
-            const resp = await fetch('/api/jellyfin/library/artists');
-            if (!resp.ok) throw new Error('Failed to load artists');
+            const resp = await fetch('/api/jellyfin/library/albums');
             const data = await resp.json();
-            this._libArtistsCache = data;
-            this._renderArtists(data);
-        } catch (err) {
-            content.innerHTML = '<div class="library-loading" style="color:var(--error)">⚠ Failed to load artists.<br>Check Jellyfin connection.</div>';
+            // Show most recent albums (sorted by year desc, take first 20)
+            const recent = [...data].sort((a, b) => (b.year||0) - (a.year||0)).slice(0, 20);
+            this._renderAlbumsGrid(recent);
+        } catch {
+            content.innerHTML = '<div class="library-loading">Failed to load library.</div>';
         }
     },
 
-    async _loadAlbums(artistId, artistName) {
-        const content = document.getElementById('lib-content');
-        content.innerHTML = '<div class="library-loading">Loading albums...</div>';
+    async _loadAllAlbums() {
+        const content = document.getElementById('library-content');
         try {
-            const url = '/api/jellyfin/library/albums' + (artistId ? '?artistId=' + artistId : '');
-            const resp = await fetch(url);
-            if (!resp.ok) throw new Error('Failed to load albums');
+            const resp = await fetch('/api/jellyfin/library/albums');
             const data = await resp.json();
-            this._libAlbumsCache = data;
-            this._libView = 'albums';
-            this._libParentId = artistId;
-            this._libParentName = artistName;
-            document.getElementById('lib-breadcrumb').textContent = artistName;
-            this._renderAlbums(data);
-        } catch (err) {
-            content.innerHTML = '<div class="library-loading" style="color:var(--error)">⚠ Failed to load albums.</div>';
+            this._renderAlbumsGrid(data);
+        } catch {
+            content.innerHTML = '<div class="library-loading">Failed to load albums.</div>';
         }
     },
 
-    async _loadTracks(albumId, albumName) {
-        const content = document.getElementById('lib-content');
-        content.innerHTML = '<div class="library-loading">Loading tracks...</div>';
+    async _loadAllTracks() {
+        const content = document.getElementById('library-content');
         try {
-            const resp = await fetch('/api/jellyfin/library/tracks?albumId=' + albumId);
-            if (!resp.ok) throw new Error('Failed to load tracks');
+            // Get a few albums and show their tracks
+            const resp = await fetch('/api/jellyfin/library/albums');
+            const albums = await resp.json();
+            let allTracks = [];
+            for (const album of albums.slice(0, 10)) {
+                const tResp = await fetch('/api/jellyfin/library/tracks?albumId=' + album.id);
+                const tracks = await tResp.json();
+                allTracks = allTracks.concat(tracks.map(t => ({...t, albumName: album.name})));
+            }
+            this._renderTracksList(allTracks);
+        } catch {
+            content.innerHTML = '<div class="library-loading">Failed to load tracks.</div>';
+        }
+    },
+
+    async _searchLibrary(query) {
+        const content = document.getElementById('library-content');
+        content.innerHTML = '<div class="library-loading">Searching...</div>';
+        try {
+            const resp = await fetch('/api/jellyfin/search?q=' + encodeURIComponent(query));
             const data = await resp.json();
-            this._libView = 'tracks';
-            document.getElementById('lib-breadcrumb').textContent = albumName;
-            this._renderTracks(data);
-        } catch (err) {
-            content.innerHTML = '<div class="library-loading" style="color:var(--error)">⚠ Failed to load tracks.</div>';
+            content.innerHTML = '<div style="padding:8px;font-size:11px;color:var(--text-dim)">' +
+                data.length + ' results for "' + this._esc(query) + '"</div>';
+            this._renderTracksList(data.map(t => ({
+                id: t.id, title: t.title, artist: t.artist, album: t.album,
+                duration: t.duration, trackNum: 0
+            })));
+        } catch {
+            content.innerHTML = '<div class="library-loading">Search failed.</div>';
         }
     },
 
-    _renderLibrary() {
-        if (this._libView === 'artists') {
-            this._renderArtists(this._libArtistsCache || []);
-        } else if (this._libView === 'albums') {
-            this._renderAlbums(this._libAlbumsCache || []);
-        }
-    },
-
-    _renderArtists(data) {
-        const content = document.getElementById('lib-content');
-        if (!data.length) {
-            content.innerHTML = '<div class="library-loading">No artists found.</div>';
-            return;
-        }
-        let html = '<div class="library-grid">';
-        data.forEach(a => {
-            const img = a.imageUrl
-                ? `<img class="library-card-img" src="${a.imageUrl}" alt="" loading="lazy" onerror="this.textContent='🎤'">`
-                : '<span class="library-card-img">🎤</span>';
-            html += `<div class="library-card" data-id="${a.id}" data-name="${a.name}" data-type="artist">
-                ${img}
-                <div class="library-card-name">${this._esc(a.name)}</div>
-                <div class="library-card-sub">Artist</div>
-            </div>`;
-        });
-        html += '</div>';
-        content.innerHTML = html;
-        content.querySelectorAll('.library-card').forEach(card => {
-            card.addEventListener('click', () => {
-                this._loadAlbums(card.dataset.id, card.dataset.name);
-            });
-        });
-    },
-
-    _renderAlbums(data) {
-        const content = document.getElementById('lib-content');
+    _renderAlbumsGrid(data) {
+        const content = document.getElementById('library-content');
         if (!data.length) {
             content.innerHTML = '<div class="library-loading">No albums found.</div>';
             return;
@@ -904,30 +878,28 @@ const Player = {
             const img = a.imageUrl
                 ? `<img class="library-card-img" src="${a.imageUrl}" alt="" loading="lazy" onerror="this.textContent='💿'">`
                 : '<span class="library-card-img">💿</span>';
-            html += `<div class="library-card" data-id="${a.id}" data-name="${a.name}" data-type="album">
+            html += `<div class="library-card" data-id="${a.id}" data-name="${a.name}">
                 ${img}
                 <div class="library-card-name">${this._esc(a.name)}</div>
-                <div class="library-card-sub">${a.year || ''} ${a.artist ? '· '+this._esc(a.artist) : ''}</div>
+                <div class="library-card-sub">${a.year||''} · ${this._esc(a.artist||'')}</div>
             </div>`;
         });
         html += '</div>';
         content.innerHTML = html;
         content.querySelectorAll('.library-card').forEach(card => {
-            card.addEventListener('click', () => {
-                this._loadTracks(card.dataset.id, card.dataset.name);
-            });
+            card.addEventListener('click', () => this._loadTracksForAlbum(card.dataset.id, card.dataset.name));
         });
     },
 
-    _renderTracks(data) {
-        const content = document.getElementById('lib-content');
+    _renderTracksList(data) {
+        const content = document.getElementById('library-content');
         if (!data.length) {
             content.innerHTML = '<div class="library-loading">No tracks found.</div>';
             return;
         }
         let html = '<div class="library-track-list">';
         data.forEach(t => {
-            html += `<div class="library-track" data-id="${t.id}" data-title="${this._esc(t.title)}" data-artist="${this._esc(t.artist)}" data-album="${this._esc(t.album)}">
+            html += `<div class="library-track" data-id="${t.id}" data-title="${this._esc(t.title)}" data-artist="${this._esc(t.artist)}" data-album="${this._esc(t.album || t.albumName || '')}">
                 <span class="library-track-num">${t.trackNum || ''}</span>
                 <span class="library-track-title">${this._esc(t.title)}</span>
                 <span class="library-track-artist">${this._esc(t.artist)}</span>
@@ -937,17 +909,74 @@ const Player = {
         });
         html += '</div>';
         content.innerHTML = html;
-        // Click track → play stream
         content.querySelectorAll('.library-track').forEach(row => {
             const playBtn = row.querySelector('.library-track-btn');
             playBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this._queueAndPlay(row.dataset);
             });
-            row.addEventListener('dblclick', () => {
-                this._queueAndPlay(row.dataset);
-            });
+            row.addEventListener('dblclick', () => this._queueAndPlay(row.dataset));
         });
+    },
+
+    async _loadTracksForAlbum(albumId, albumName) {
+        const content = document.getElementById('library-content');
+        content.innerHTML = '<div class="library-loading">Loading tracks...</div>';
+        try {
+            const resp = await fetch('/api/jellyfin/library/tracks?albumId=' + albumId);
+            const data = await resp.json();
+            // Add breadcrumb-like header
+            content.innerHTML = '<div style="padding:4px 8px;font-size:10px;color:var(--text-dim);margin-bottom:4px">' +
+                '💿 ' + this._esc(albumName) + '</div>';
+            this._renderTracksList(data);
+        } catch {
+            content.innerHTML = '<div class="library-loading">Failed to load tracks.</div>';
+        }
+    },
+
+    _renderPlaylists() {
+        const content = document.getElementById('library-content');
+        content.innerHTML = '<div class="library-loading" style="padding:20px">Playlists coming soon.<br>Will sync with Jellyfin playlists.</div>';
+    },
+
+    async _loadArtists() {
+        const content = document.getElementById('library-content');
+        try {
+            const resp = await fetch('/api/jellyfin/library/artists');
+            const data = await resp.json();
+            if (!data.length) { content.innerHTML = '<div class="library-loading">No artists found.</div>'; return; }
+            let html = '<div class="library-grid">';
+            data.forEach(a => {
+                const img = a.imageUrl
+                    ? `<img class="library-card-img" src="${a.imageUrl}" alt="" loading="lazy" onerror="this.textContent='🎤'">`
+                    : '<span class="library-card-img">🎤</span>';
+                html += `<div class="library-card" data-id="${a.id}" data-name="${a.name}">
+                    ${img}
+                    <div class="library-card-name">${this._esc(a.name)}</div>
+                    <div class="library-card-sub">Artist</div>
+                </div>`;
+            });
+            html += '</div>';
+            content.innerHTML = html;
+            content.querySelectorAll('.library-card').forEach(card => {
+                card.addEventListener('click', () => this._loadArtistAlbums(card.dataset.id, card.dataset.name));
+            });
+        } catch {
+            content.innerHTML = '<div class="library-loading">Failed to load artists.</div>';
+        }
+    },
+
+    async _loadArtistAlbums(artistId, artistName) {
+        const content = document.getElementById('library-content');
+        content.innerHTML = '<div class="library-loading">Loading albums...</div>';
+        try {
+            const resp = await fetch('/api/jellyfin/library/albums?artistId=' + artistId);
+            const data = await resp.json();
+            content.innerHTML = '<div style="padding:4px 8px;font-size:10px;color:var(--text-dim);margin-bottom:4px">🎤 ' + this._esc(artistName) + '</div>';
+            this._renderAlbumsGrid(data);
+        } catch {
+            content.innerHTML = '<div class="library-loading">Failed to load albums.</div>';
+        }
     },
 
     async _queueAndPlay(track) {

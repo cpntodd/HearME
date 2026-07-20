@@ -66,7 +66,7 @@
             <!-- Player View -->
             <div class="view active" id="view-player">
                 <div class="player-layout">
-                    <!-- Left: Album Art + Info -->
+                    <!-- Left: Album Art + Visualizer + VU + VFD + Lyrics -->
                     <div class="player-left">
                         <div class="player-album-art-container">
                             <img id="player-album-art" class="player-album-art" src="" alt="">
@@ -77,49 +77,45 @@
                             <div id="player-track-artist" class="player-track-artist">—</div>
                             <div id="player-track-album" class="player-track-album">—</div>
                         </div>
-                    </div>
-                    <!-- Center: Visualizer + VFD + VU -->
-                    <div class="player-center">
+                        <!-- Compact Visualizer -->
                         <canvas id="player-visualizer" class="player-visualizer"></canvas>
+                        <!-- VU + VFD display row -->
                         <div class="player-displays">
                             <canvas id="player-vfd" class="player-vfd" width="240" height="40"></canvas>
-                            <canvas id="player-vu-left" class="player-vu" width="30" height="80"></canvas>
-                            <canvas id="player-vu-right" class="player-vu" width="30" height="80"></canvas>
+                            <canvas id="player-vu-left" class="player-vu" width="30" height="60"></canvas>
+                            <canvas id="player-vu-right" class="player-vu" width="30" height="60"></canvas>
                         </div>
-                        <div class="player-visualizer-presets">
-                            <button class="detail-filter-tab active" data-preset="spectrum">Spectrum</button>
-                            <button class="detail-filter-tab" data-preset="oscilloscope">Wave</button>
-                            <button class="detail-filter-tab" data-preset="circular">Radial</button>
-                            <button class="detail-filter-tab" data-preset="particles">Particles</button>
-                            <button class="detail-filter-tab" data-preset="fire">Fire</button>
-                            <button class="detail-filter-tab" data-preset="bars">Bars+Beads</button>
+                        <!-- Togglable Lyrics -->
+                        <div id="player-lyrics" class="player-lyrics hidden">
+                            <div id="player-lyrics-text">Lyrics will appear here...</div>
                         </div>
                     </div>
-                    <!-- Resize grip -->
-                    <div class="player-resize-grip" id="player-resize-grip"></div>
-                    <!-- Right: Playlist / Library -->
+                    <!-- Center: Media Library -->
+                    <div class="player-center">
+                        <div class="library-layout">
+                            <div class="library-searchbar">
+                                <input type="text" id="lib-search-input" class="library-search-input" placeholder="Search your library...">
+                            </div>
+                            <div class="library-main">
+                                <div class="library-sidebar">
+                                    <button class="library-nav-item active" data-view="home">🏠 Home</button>
+                                    <button class="library-nav-item" data-view="artists">🎤 Artists</button>
+                                    <button class="library-nav-item" data-view="albums">💿 Albums</button>
+                                    <button class="library-nav-item" data-view="tracks">🎵 Tracks</button>
+                                    <div class="library-nav-sep"></div>
+                                    <button class="library-nav-item" data-view="playlists">📋 Playlists</button>
+                                </div>
+                                <div id="library-content" class="library-content"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Right: Now Playing -->
+                    <div id="player-resize-grip" class="player-resize-grip"></div>
                     <div class="player-right" id="player-right-panel">
                         <div class="panel inset" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-                            <div class="player-right-tabs">
-                                <button class="player-right-tab active" data-panel="playlist">Playlist</button>
-                                <button class="player-right-tab" data-panel="library">Library</button>
-                            </div>
-                            <!-- Playlist Panel -->
-                            <div class="player-right-panel active" id="panel-playlist">
-                                <div id="player-playlist" class="player-playlist">
-                                    <div class="player-playlist-empty">Queue is empty.<br>Browse Library to add tracks.</div>
-                                </div>
-                            </div>
-                            <!-- Library Panel -->
-                            <div class="player-right-panel" id="panel-library">
-                                <div class="library-nav">
-                                    <button id="lib-back" class="player-ctrl-btn" title="Back" style="font-size:12px;padding:1px 6px">◀</button>
-                                    <span id="lib-breadcrumb" class="library-breadcrumb">All Artists</span>
-                                    <input type="text" id="lib-search" class="input" placeholder="Filter..." style="flex:1;height:20px;font-size:10px;padding:1px 4px">
-                                </div>
-                                <div id="lib-content" class="library-content">
-                                    <div class="library-loading">Loading library...</div>
-                                </div>
+                            <div class="panel-header">Now Playing</div>
+                            <div id="now-playing-list" class="player-playlist">
+                                <div class="player-playlist-empty">Queue is empty.<br>Browse your library to add tracks.</div>
                             </div>
                         </div>
                     </div>
@@ -140,7 +136,7 @@
                         <span id="player-time-total" class="player-time">0:00</span>
                     </div>
                     <div class="player-controls-right">
-                        <span class="player-time" title="Track info" id="player-meta-info" style="font-size:10px;min-width:80px;text-align:right">— kbps · — kHz</span>
+                        <span class="player-time" title="Track info" id="player-meta-info">— kbps · — kHz</span>
                         <span class="player-time">🔊</span>
                         <input type="range" id="player-volume" class="player-volume" min="0" max="100" value="80">
                         <span class="player-time" style="font-size:9px">L</span>
@@ -167,8 +163,15 @@
                         </select>
                         <button id="btn-eq-toggle" class="player-ctrl-btn" title="Toggle EQ">🎚</button>
                     </div>
-                    <div class="player-eq-bands" id="player-eq-bands">
-                        <!-- 10 bands: 31, 62, 125, 250, 500, 1k, 2k, 4k, 8k, 16k -->
+                    <div class="player-eq-bands" id="player-eq-bands"></div>
+                    <!-- Visualizer context menu -->
+                    <div id="visualizer-context-menu" class="context-menu hidden">
+                        <div class="context-menu-item" data-preset="spectrum">Spectrum</div>
+                        <div class="context-menu-item" data-preset="oscilloscope">Oscilloscope</div>
+                        <div class="context-menu-item" data-preset="circular">Circular</div>
+                        <div class="context-menu-item" data-preset="particles">Particles</div>
+                        <div class="context-menu-item" data-preset="fire">Fire</div>
+                        <div class="context-menu-item" data-preset="bars">Bars+Beads</div>
                     </div>
                 </div>
             </div>
