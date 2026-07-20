@@ -657,8 +657,9 @@ func (s *Server) handleJellyfinStream(w http.ResponseWriter, r *http.Request) {
 		s.writeJSONError(w, http.StatusBadRequest, "item ID required")
 		return
 	}
+	// Return the direct stream URL — browser plays it natively with range support
 	streamURL := s.jellyfin.StreamURL(itemID)
-	http.Redirect(w, r, streamURL, http.StatusTemporaryRedirect)
+	s.writeJSON(w, http.StatusOK, map[string]string{"url": streamURL})
 }
 
 func (s *Server) handleJellyfinArtists(w http.ResponseWriter, r *http.Request) {

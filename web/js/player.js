@@ -19,6 +19,7 @@ const Player = {
     _vol: 0.8,
     _balance: 0,
     _eqGains: [0,0,0,0,0,0,0,0,0,0],
+    _loading: false,
 
     // Library state
     _libView: 'artists', // 'artists', 'albums', 'tracks'
@@ -165,8 +166,17 @@ const Player = {
             this.analyserR.fftSize = 256;
         }
 
-        // Stop current playback
-        this.stop();
+        // Clean up previous source without full stop (don't kill audioCtx)
+        if (this.sourceNode) {
+            try { this.sourceNode.disconnect(); } catch(e) {}
+            this.sourceNode = null;
+        }
+        if (this.audioEl) {
+            try { this.audioEl.pause(); } catch(e) {}
+            this.audioEl.src = '';
+            this.audioEl = null;
+        }
+        cancelAnimationFrame(this.animFrame);
 
         try {
             const audioEl = new Audio();
@@ -213,7 +223,11 @@ const Player = {
             this._startVisualizer();
         } catch (err) {
             console.error('Playback error:', err);
+            // If AbortError, it means stop() was called — don't treat as error
+            if (err.name === 'AbortError') return;
             this.isPlaying = false;
+            this.vfdText = 'ERROR';
+            document.getElementById('btn-play').textContent = '▶';
         }
     },
 
@@ -234,32 +248,35 @@ const Player = {
     },
 
     stop() {
-        if (this.audioEl) {
-            this.audioEl.pause();
-            this.audioEl.src = '';
-        }
-        if (this.sourceNode) {
-            this.sourceNode.disconnect();
-            this.sourceNode = null;
-        }
         this.isPlaying = false;
         document.getElementById('btn-play').textContent = '▶';
+        if (this.audioEl) {
+            try { this.audioEl.pause(); } catch(e) {}
+            this.audioEl.currentTime = 0;
+        }
+        // Don't clear audioEl.src or nullify — allows resume via play button
+        document.getElementById('player-seek').value = 0;
+        document.getElementById('player-time-current').textContent = '0:00';
         cancelAnimationFrame(this.animFrame);
+        this.vfdText = 'STOPPED';
     },
 
     next() { this._navigate(1); },
     prev() { this._navigate(-1); },
 
     _navigate(dir) {
-        if (this.playlist.length === 0) return;
+        if (this.playlist.length === 0 || this._loading) return;
+        this._loading = true;
         if (this.shuffle) {
             this.playlistIndex = Math.floor(Math.random() * this.playlist.length);
         } else {
             this.playlistIndex = (this.playlistIndex + dir + this.playlist.length) % this.playlist.length;
         }
         const track = this.playlist[this.playlistIndex];
-        this.loadTrack(track.url, track);
-        this._updatePlaylistUI();
+        this.loadTrack(track.url, track).finally(() => {
+            this._loading = false;
+            this._updatePlaylistUI();
+        });
     },
 
     _onEnded() {
@@ -933,17 +950,32 @@ const Player = {
         });
     },
 
-    _queueAndPlay(track) {
-        const streamUrl = '/api/jellyfin/stream/' + track.id;
-        const metadata = {
-            title: track.title,
-            artist: track.artist,
-            album: track.album,
-        };
-        // Add to playlist and play immediately
-        this.addToPlaylist([{ url: streamUrl, title: track.title, artist: track.artist, album: track.album }]);
-        this.playlistIndex = this.playlist.length - 1;
-        this.loadTrack(streamUrl, metadata);
+    async _queueAndPlay(track) {
+        if (this._loading) return;
+        this._loading = true;
+
+        try {
+            // Fetch stream URL from backend
+            const resp = await fetch('/api/jellyfin/stream/' + track.id);
+            const data = await resp.json();
+            const streamUrl = data.url;
+
+            const entry = {
+                url: streamUrl,
+                title: track.title,
+                artist: track.artist,
+                album: track.album,
+            };
+            // Add to playlist with the resolved URL
+            this.playlist.push(entry);
+            this.playlistIndex = this.playlist.length - 1;
+            this._updatePlaylistUI();
+            await this.loadTrack(streamUrl, entry);
+        } catch(e) {
+            console.error('Failed to queue track:', e);
+        } finally {
+            this._loading = false;
+        }
     },
 
     _esc(s) {
