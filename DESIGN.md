@@ -2,9 +2,17 @@
 
 ## Overview
 
-A self-contained, single-binary desktop web application for discovering upcoming tours and exploring artist relationships. Enter artists you listen to, get a grid of their upcoming shows, and explore a Tuneglue-style interactive node graph to discover related artists.
+A self-contained, single-binary desktop web application for music discovery and playback. Features include a Spotify-style media library (Jellyfin-integrated), Winamp-inspired audio player with 10-band EQ and visualizers, force-directed artist relationship graph, and upcoming tour grid — all from one static binary.
 
 **Motto:** Your music. Their tours. One binary.
+
+**Key features (v0.1.0):**
+- 🎧 Audio player: Web Audio API engine, 6 visualizer presets, 10-band EQ, VU meters, VFD display
+- 📚 Media library: Spotify-like browsing (Home/Artists/Albums/Tracks), Jellyfin integration for streaming
+- 🕸️ Artist graph: Force-directed canvas, import from Jellyfin library, owned badges, pinning, orbital gravity
+- 🎫 Tour grid: Bandsintown/Songkick/Ticketmaster aggregation, sortable, offline cache
+- ⚙️ Settings: Data sources, API keys, Jellyfin, appearance (zoom/font/graph limits), audio player (EQ/visualizer/lyrics)
+- 💾 Full persistence: localStorage for artists, settings, cached tours, graph state
 
 ---
 
@@ -53,7 +61,7 @@ A self-contained, single-binary desktop web application for discovering upcoming
 - **API keys never touch the browser.** All third-party API calls go through the Go backend.
 - **Zero frontend dependencies.** No React, no jQuery, no CSS framework. Vanilla JS + hand-rolled CSS.
 - **Embedded assets.** `//go:embed` bakes HTML/CSS/JS into the binary at compile time.
-- **localStorage for persistence.** Artist list lives in the browser. Earmark SQLite for v2.
+- **localStorage for persistence.** Artist list, all settings (audio player, graph, appearance, API keys via backend), cached tours, and graph state persist across sessions. Settings include: UI zoom, font size, visualizer preset, EQ preset, default volume, lyrics toggle, crossfade, replay gain, gapless playback, scrobbling, max graph nodes, auto-expand count.
 
 ---
 
@@ -296,15 +304,27 @@ The app has a Winamp-style tab bar with four views:
 │              │                                      │
 │  ─────────── │                                      │
 │  Node Legend │                                      │
-│  ● Genre A   │                                      │
-│  ● Genre B   │                                      │
-│  ○ Size = pop│                                      │
+│  ● Selected  │ (green fill, click to expand)        │
+│  ● Expanded  │ (orange dashed ring)                 │
+│  ● Related   │ (blue default)                       │
+│  ○ Owned     │ (green dashed ring = in Jellyfin)    │
+│  · Pinned    │ (yellow dot, drag/dbl-click)         │
 ├──────────────┴─────────────────────────────────────┤
-│  Status: "MusicBrainz • Last.fm • 34 nodes"         │
+│  Status: "MusicBrainz • Last.fm • 34 nodes · 242 in library" │
 └────────────────────────────────────────────────────┘
 ```
 
-**Behavior:**
+**Graph interactions:**
+- **Click** a node → select it, show detail panel (bio, discography, album art)
+- **Click** an unexpanded node → fetch + render related artists from MusicBrainz/Last.fm
+- **Double-click** → toggle pin (pinned nodes hold position, exert orbital gravity on neighbors)
+- **Drag** a node → auto-pins it (yellow dot indicator)
+- **Right-click** → context menu: Pin/Unpin, Delete node (with connected nodes)
+- **Scroll** → zoom canvas in/out
+- **Drag empty space** → pan canvas
+- **Green dashed ring** → artist is in your Jellyfin library (owned)
+- **Orange dashed ring** → node has been expanded (relationships loaded)
+- **Import from Library** button → bulk-imports all Jellyfin artists as graph nodes, auto-expands first N (configurable)
 
 1. **Add artist** via the search bar → appears in "My Artists" list and as a center node on the canvas.
 2. **Auto-expand:** On add, 1 degree of related artists is fetched and rendered around the center node.
