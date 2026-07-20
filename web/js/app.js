@@ -38,9 +38,19 @@ const App = {
             if (data.names) {
                 this._ownedArtists = new Set(data.names.map(n => n.toLowerCase()));
                 this._ownedLoaded = true;
-                // Update status bar
+                // Update status bar (replace, don't append)
                 const count = document.getElementById('status-node-count');
-                if (count) count.textContent += ` · ${data.names.length} owned`;
+                if (count) {
+                    const base = count.textContent.split(' ·')[0];
+                    count.textContent = base + ' · ' + data.names.length + ' in library';
+                }
+                // Trigger re-render for graph and tours to show owned badges
+                if (Graph && Graph.nodes && Graph.nodes.length > 0) {
+                    // Graph re-renders on next animation frame automatically
+                }
+                if (Grid && Grid.render) {
+                    Grid.render();
+                }
             }
         } catch {
             // non-critical — owned badges just won't show
@@ -886,6 +896,14 @@ const App = {
             Player.preset = e.target.value;
             this._saveAudioSettings();
         });
+        document.getElementById('setting-eq-preset').addEventListener('change', (e) => {
+            Player._applyEQPreset(e.target.value);
+            this._saveAudioSettings();
+        });
+        document.getElementById('setting-default-volume').addEventListener('input', (e) => {
+            document.getElementById('setting-default-volume-val').textContent = e.target.value + '%';
+            this._saveAudioSettings();
+        });
         document.getElementById('setting-show-lyrics').addEventListener('change', (e) => {
             const lyrics = document.getElementById('player-lyrics');
             if (e.target.checked) {
@@ -902,15 +920,34 @@ const App = {
         const s = Store.getSettings();
         const preset = s.vizPreset || 'spectrum';
         document.getElementById('setting-viz-preset').value = preset;
-        Player.preset = preset;
+        if (Player) Player.preset = preset;
+        document.getElementById('setting-eq-preset').value = s.eqPreset || '';
+        document.getElementById('setting-default-volume').value = s.defaultVolume || 80;
+        document.getElementById('setting-default-volume-val').textContent = (s.defaultVolume || 80) + '%';
         document.getElementById('setting-show-lyrics').checked = s.showLyrics || false;
         if (s.showLyrics) document.getElementById('player-lyrics').classList.remove('hidden');
+        document.getElementById('setting-crossfade').value = s.crossfade || 0;
+        document.getElementById('setting-replay-gain').checked = s.replayGain || false;
+        document.getElementById('setting-gapless').checked = s.gapless || false;
+        document.getElementById('setting-scrobble').checked = s.scrobble || false;
+        // Apply default volume
+        const vol = s.defaultVolume || 80;
+        document.getElementById('player-volume').value = vol;
+        if (Player) Player._vol = vol / 100;
+        // Apply default EQ
+        if (s.eqPreset && Player) Player._applyEQPreset(s.eqPreset);
     },
 
     _saveAudioSettings() {
         const s = Store.getSettings();
         s.vizPreset = document.getElementById('setting-viz-preset').value;
+        s.eqPreset = document.getElementById('setting-eq-preset').value;
+        s.defaultVolume = parseInt(document.getElementById('setting-default-volume').value);
         s.showLyrics = document.getElementById('setting-show-lyrics').checked;
+        s.crossfade = parseFloat(document.getElementById('setting-crossfade').value);
+        s.replayGain = document.getElementById('setting-replay-gain').checked;
+        s.gapless = document.getElementById('setting-gapless').checked;
+        s.scrobble = document.getElementById('setting-scrobble').checked;
         Store.setSettings(s);
     },
 

@@ -397,6 +397,7 @@
                             <button id="btn-apply-appearance" class="btn">Apply</button>
                         </div>
                     </div>
+                    <div class="panel inset">
                         <div class="panel-header">Audio Player</div>
                         <div class="panel-body settings-body">
                             <div class="setting-field">
@@ -411,6 +412,25 @@
                                 </select>
                             </div>
                             <div class="setting-field">
+                                <label class="setting-label">Default EQ Preset</label>
+                                <select id="setting-eq-preset" class="select">
+                                    <option value="">Manual (Flat)</option>
+                                    <option value="rock">Rock</option>
+                                    <option value="pop">Pop</option>
+                                    <option value="classical">Classical</option>
+                                    <option value="jazz">Jazz</option>
+                                    <option value="electronic">Electronic</option>
+                                    <option value="hiphop">Hip Hop</option>
+                                    <option value="metal">Metal</option>
+                                    <option value="vocal">Vocal Boost</option>
+                                    <option value="bass">Bass Boost</option>
+                                </select>
+                            </div>
+                            <div class="setting-field">
+                                <label class="setting-label">Default Volume: <span id="setting-default-volume-val">80%</span></label>
+                                <input type="range" id="setting-default-volume" class="setting-slider" min="0" max="100" value="80">
+                            </div>
+                            <div class="setting-field">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="setting-show-lyrics"> Show Lyrics
                                 </label>
@@ -422,6 +442,16 @@
                             <div class="setting-field">
                                 <label class="checkbox-label">
                                     <input type="checkbox" id="setting-replay-gain"> Replay Gain (volume normalization)
+                                </label>
+                            </div>
+                            <div class="setting-field">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="setting-gapless"> Gapless Playback
+                                </label>
+                            </div>
+                            <div class="setting-field">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="setting-scrobble"> Scrobble to Last.fm
                                 </label>
                             </div>
                         </div>
