@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HearME</title>
+    <link rel="stylesheet" href="/css/winamp.css">
+</head>
+<body>
+    <div id="app-wrapper" style="transform-origin:0 0">
+    <!-- Title Bar -->
+    <div class="window" id="app-window">
+        <div class="titlebar" id="titlebar">
+            <span class="titlebar-icon">🎵</span>
+            <span class="titlebar-text">HearME</span>
+            <div class="titlebar-controls">
+                <button class="titlebar-btn" id="btn-minimize" aria-label="Minimize">─</button>
+                <button class="titlebar-btn" id="btn-maximize" aria-label="Maximize">□</button>
+                <button class="titlebar-btn titlebar-btn-close" id="btn-close" aria-label="Close">✕</button>
+            </div>
+        </div>
+
+        <!-- Menu Bar -->
+        <div class="menubar">
+            <span class="menu-item">File</span>
+            <span class="menu-item">View</span>
+            <span class="menu-item">Help</span>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="tabbar" id="tabbar">
+            <button class="tab active" data-tab="player">Player</button>
+            <button class="tab" data-tab="graph">Graph Explorer</button>
+            <button class="tab" data-tab="tours">Tour Grid</button>
+            <button class="tab" data-tab="settings">Settings</button>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="content" id="content">
+            <!-- Player View -->
+            <div class="view active" id="view-player">
+                <div class="player-layout">
+                    <!-- Left: Album Art + Info -->
+                    <div class="player-left">
+                        <div class="player-album-art-container">
+                            <img id="player-album-art" class="player-album-art" src="" alt="">
+                            <div id="player-album-fallback" class="player-album-fallback">💿</div>
+                        </div>
+                        <div class="player-track-info">
+                            <div id="player-track-title" class="player-track-title">No Track</div>
+                            <div id="player-track-artist" class="player-track-artist">—</div>
+                            <div id="player-track-album" class="player-track-album">—</div>
+                        </div>
+                    </div>
+                    <!-- Center: Visualizer + VFD + VU -->
+                    <div class="player-center">
+                        <canvas id="player-visualizer" class="player-visualizer"></canvas>
+                        <div class="player-displays">
+                            <canvas id="player-vfd" class="player-vfd" width="240" height="40"></canvas>
+                            <canvas id="player-vu-left" class="player-vu" width="30" height="80"></canvas>
+                            <canvas id="player-vu-right" class="player-vu" width="30" height="80"></canvas>
+                        </div>
+                        <div class="player-visualizer-presets">
+                            <button class="detail-filter-tab active" data-preset="spectrum">Spectrum</button>
+                            <button class="detail-filter-tab" data-preset="oscilloscope">Wave</button>
+                            <button class="detail-filter-tab" data-preset="circular">Radial</button>
+                            <button class="detail-filter-tab" data-preset="particles">Particles</button>
+                            <button class="detail-filter-tab" data-preset="fire">Fire</button>
+                            <button class="detail-filter-tab" data-preset="bars">Bars+Beads</button>
+                        </div>
+                    </div>
+                    <!-- Right: Playlist -->
+                    <div class="player-right">
+                        <div class="panel inset" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+                            <div class="panel-header">Playlist</div>
+                            <div id="player-playlist" class="player-playlist">
+                                <div class="player-playlist-empty">Queue is empty.<br>Browse Jellyfin to add tracks.</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Transport Controls -->
+                <div class="player-transport">
+                    <div class="player-controls-left">
+                        <button id="btn-shuffle" class="player-ctrl-btn" title="Shuffle">🔀</button>
+                        <button id="btn-prev" class="player-ctrl-btn" title="Previous">⏮</button>
+                        <button id="btn-play" class="player-ctrl-btn player-ctrl-play" title="Play/Pause">▶</button>
+                        <button id="btn-next" class="player-ctrl-btn" title="Next">⏭</button>
+                        <button id="btn-repeat" class="player-ctrl-btn" title="Repeat">🔁</button>
+                    </div>
+                    <div class="player-seek-container">
+                        <span id="player-time-current" class="player-time">0:00</span>
+                        <input type="range" id="player-seek" class="player-seek" min="0" max="100" value="0">
+                        <span id="player-time-total" class="player-time">0:00</span>
+                    </div>
+                    <div class="player-controls-right">
+                        <span class="player-time">🔊</span>
+                        <input type="range" id="player-volume" class="player-volume" min="0" max="100" value="80">
+                        <button id="btn-eq" class="player-ctrl-btn" title="Equalizer">🎚</button>
+                    </div>
+                </div>
+            </div>
+            <!-- Graph Explorer View -->
+            <div class="view active" id="view-graph">
+                <div class="graph-layout">
+                    <div class="graph-sidebar">
+                        <div class="panel inset" id="artist-search-panel">
+                            <div class="panel-header">Add Artist</div>
+                            <div class="panel-body">
+                                <div class="input-group">
+                                    <input type="text" id="artist-search-input" class="input" placeholder="Search artist...">
+                                    <button id="btn-add-artist" class="btn">Add</button>
+                                </div>
+                                <div id="disambiguation-container" class="hidden"></div>
+                            </div>
+                        </div>
+                        <div class="panel inset" id="my-artists-panel">
+                            <div class="panel-header">My Artists</div>
+                            <div class="panel-body">
+                                <ul id="artist-list" class="artist-list">
+                                    <li class="artist-list-empty">No artists added yet.<br>Search above to add some.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="panel inset" id="legend-panel">
+                            <div class="panel-header">Legend</div>
+                            <div class="panel-body legend-body">
+                                <div class="legend-item"><span class="legend-color" style="background:#22ff22;"></span> Selected</div>
+                                <div class="legend-item"><span class="legend-color" style="background:#ff8844;"></span> Expanded</div>
+                                <div class="legend-item"><span class="legend-color" style="background:#4488ff;"></span> Related</div>
+                            </div>
+                        </div>
+                        <div class="panel inset" id="graph-actions-panel">
+                            <div class="panel-header">Actions</div>
+                            <div class="panel-body">
+                                <button id="btn-clear-graph" class="btn btn-danger" style="width:100%">Clear Graph</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="graph-canvas-container">
+                        <canvas id="graph-canvas"></canvas>
+                        <div id="graph-warning" class="graph-warning hidden">
+                            ⚠ Node limit reached (500). Remove some artists to add more.
+                        </div>
+                        <div class="graph-hint">🖱 Drag nodes • Scroll to zoom • Click to expand • Dbl-click to focus</div>
+                        <!-- Artist Detail Panel -->
+                        <div id="detail-panel" class="detail-panel hidden">
+                            <div class="detail-resize-grip" id="detail-resize-grip"></div>
+                            <div class="detail-header">
+                                <span id="detail-name" class="detail-name"></span>
+                                <button id="detail-close" class="titlebar-btn titlebar-btn-close" title="Close">✕</button>
+                            </div>
+                            <div class="detail-body">
+                                <div class="detail-section-resizable" id="detail-section-top" style="height: auto; min-height: 60px; max-height: 300px;">
+                                    <div id="detail-artist-img-container" class="detail-artist-img-container hidden">
+                                        <img id="detail-artist-img" class="detail-artist-image" src="" alt="" onerror="this.style.display='none';document.getElementById('detail-artist-fallback').style.display='flex'">
+                                        <div id="detail-artist-fallback" class="detail-artist-fallback" style="display:none">🎸</div>
+                                    </div>
+                                    <div id="detail-genres" class="detail-genres"></div>
+                                </div>
+                                <div class="detail-separator" data-resize="top" title="Drag to resize">
+                                    <div class="detail-separator-line"></div>
+                                </div>
+                                <div class="detail-section-resizable" id="detail-section-bio" style="height: 80px; min-height: 40px; max-height: 200px;">
+                                    <div id="detail-bio" class="detail-bio hidden"></div>
+                                </div>
+                                <div class="detail-separator" data-resize="bio" title="Drag to resize">
+                                    <div class="detail-separator-line"></div>
+                                </div>
+                                <div class="detail-section-resizable detail-section-grow" id="detail-section-disco" style="min-height: 100px;">
+                                    <div class="detail-filter-tabs" id="detail-filters">
+                                        <button class="detail-filter-tab active" data-filter="all">All</button>
+                                        <button class="detail-filter-tab" data-filter="album">Albums</button>
+                                        <button class="detail-filter-tab" data-filter="ep">EPs</button>
+                                        <button class="detail-filter-tab" data-filter="single">Singles</button>
+                                        <button class="detail-filter-tab" data-filter="live">Live</button>
+                                        <button class="detail-filter-tab" data-filter="compilation">Compilations</button>
+                                        <button class="detail-filter-tab detail-sort-btn" id="detail-sort-btn" title="Sort order">↓ Year</button>
+                                    </div>
+                                    <div id="detail-discography" class="detail-discography-grid"></div>
+                                </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tour Grid View -->
+            <div class="view" id="view-tours">
+                <div class="tour-filters">
+                    <div class="filter-group">
+                        <label class="filter-label">Genre:</label>
+                        <select id="filter-genre" class="select">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Country:</label>
+                        <select id="filter-country" class="select">
+                            <option value="">All</option>
+                        </select>
+                    </div>
+                    <button id="btn-refresh-tours" class="btn btn-icon" title="Refresh tours">🔄 Refresh</button>
+                </div>
+                <div class="tour-table-container">
+                    <table class="tour-table" id="tour-table">
+                        <thead>
+                            <tr>
+                                <th class="sortable" data-sort="artistName">Artist</th>
+                                <th class="sortable" data-sort="tourName">Tour</th>
+                                <th class="sortable" data-sort="date">Date</th>
+                                <th>City</th>
+                                <th>Venue</th>
+                                <th>Country</th>
+                                <th>Ticket</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tour-table-body">
+                            <tr class="tour-empty">
+                                <td colspan="7">No tours to display. Select artists in the Graph Explorer and check "Show in Tour Grid".</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="tour-status" id="tour-status">
+                    <span id="tour-count">0 tours</span>
+                    <span id="tour-last-updated"></span>
+                    <span id="tour-offline-warning" class="hidden offline-warning">⚠ Offline — showing cached data</span>
+                </div>
+            </div>
+
+            <!-- Settings View -->
+            <div class="view" id="view-settings">
+                <div class="settings-container">
+                    <div class="panel inset">
+                        <div class="panel-header">Data Sources</div>
+                        <div class="panel-body settings-body">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="setting-bandsintown" disabled> Bandsintown (free key)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="setting-songkick" disabled> Songkick (paid key)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="setting-ticketmaster" disabled> Ticketmaster (paid key)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="setting-musicbrainz" checked disabled> MusicBrainz (free)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="setting-lastfm"> Last.fm (free key)
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="setting-scraper" checked> RSS Scraper
+                            </label>
+                        </div>
+                    </div>
+                    <div class="panel inset">
+                        <div class="panel-header">API Keys</div>
+                        <div class="panel-body settings-body">
+                            <div class="setting-field">
+                                <label class="setting-label">Last.fm API Key</label>
+                                <input type="password" id="setting-lastfm-key" class="input" placeholder="Free key from last.fm/api">
+                            </div>
+                            <div class="setting-field">
+                                <label class="setting-label">Bandsintown App ID</label>
+                                <input type="password" id="setting-bandsintown-key" class="input" placeholder="Free app_id from bandsintown.com">
+                            </div>
+                            <div class="setting-field">
+                                <label class="setting-label">Songkick API Key</label>
+                                <input type="password" id="setting-songkick-key" class="input" placeholder="Paid key from songkick.com">
+                            </div>
+                            <div class="setting-field">
+                                <label class="setting-label">Ticketmaster API Key</label>
+                                <input type="password" id="setting-ticketmaster-key" class="input" placeholder="Paid key from ticketmaster.com">
+                            </div>
+                            <button id="btn-save-keys" class="btn">Save API Keys</button>
+                            <span id="setting-save-status" class="setting-status"></span>
+                        </div>
+                    </div>
+                    <div class="panel inset">
+                        <div class="panel-header">Appearance</div>
+                        <div class="panel-body settings-body">
+                            <div class="setting-field">
+                                <label class="setting-label">UI Zoom: <span id="setting-zoom-val">1.0x</span></label>
+                                <div class="setting-stepper">
+                                    <button id="setting-zoom-down" class="btn btn-icon">−</button>
+                                    <input type="range" id="setting-zoom" class="setting-slider" min="0.8" max="2.0" step="0.1" value="1.0">
+                                    <button id="setting-zoom-up" class="btn btn-icon">+</button>
+                                </div>
+                            </div>
+                            <div class="setting-field">
+                                <label class="setting-label">Font Size: <span id="setting-font-val">12px</span></label>
+                                <div class="setting-stepper">
+                                    <button id="setting-font-down" class="btn btn-icon">−</button>
+                                    <input type="range" id="setting-font-size" class="setting-slider" min="10" max="22" step="1" value="12">
+                                    <button id="setting-font-up" class="btn btn-icon">+</button>
+                                </div>
+                            </div>
+                            <div class="setting-field">
+                                <label class="setting-label">Custom Font URL</label>
+                                <input type="text" id="setting-font-url" class="input" placeholder="https://fonts.googleapis.com/css2?family=...">
+                            </div>
+                            <button id="btn-apply-appearance" class="btn">Apply</button>
+                        </div>
+                    </div>
+                    <div class="panel inset">
+                        <div class="panel-header">Data Management</div>
+                        <div class="panel-body settings-body">
+                            <button id="btn-clear-cache" class="btn">Clear Cache</button>
+                            <button id="btn-export-artists" class="btn">Export Artists</button>
+                            <button id="btn-import-artists" class="btn">Import Artists</button>
+                            <button id="btn-reset-all" class="btn btn-danger">Reset All Data</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="statusbar" id="statusbar">
+            <span id="status-text">Ready</span>
+            <span class="statusbar-right">
+                <span id="status-node-count">0 nodes</span>
+                <span class="statusbar-sep">•</span>
+                <span id="status-provider">MusicBrainz</span>
+            </span>
+        </div>
+    </div>
+
+    <!-- Disambiguation Dialog -->
+    <div class="dialog-overlay hidden" id="dialog-overlay">
+        <div class="dialog window">
+            <div class="titlebar">
+                <span class="titlebar-text">Disambiguate Artist</span>
+                <button class="titlebar-btn titlebar-btn-close" id="dialog-close">✕</button>
+            </div>
+            <div class="dialog-body">
+                <p>Multiple matches found. Select the correct artist:</p>
+                <ul id="dialog-artist-list" class="artist-match-list"></ul>
+            </div>
+            <div class="dialog-footer">
+                <button id="dialog-cancel" class="btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Album Detail Modal (vinyl cover) -->
+    <div class="album-modal-overlay hidden" id="album-modal-overlay">
+        <div class="album-modal window" id="album-modal">
+            <div class="titlebar">
+                <span class="titlebar-text" id="album-modal-title">Album</span>
+                <button class="titlebar-btn titlebar-btn-close" id="album-modal-close">✕</button>
+            </div>
+            <div class="album-modal-body">
+                <div class="album-modal-art">
+                    <img id="album-modal-img" src="" alt="" class="album-modal-cover">
+                </div>
+                <div class="album-modal-info">
+                    <div id="album-modal-artist" class="album-modal-artist"></div>
+                    <div id="album-modal-meta" class="album-modal-meta"></div>
+                    <div class="album-modal-tracks-title">Tracklist</div>
+                    <div id="album-modal-tracks" class="album-modal-tracks"></div>
+                    <div id="album-modal-lyrics" class="album-modal-lyrics hidden">
+                        <div class="album-modal-tracks-title">Lyrics</div>
+                        <pre id="album-modal-lyrics-text"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Graph Context Menu -->
+    <div class="context-menu hidden" id="graph-context-menu">
+        <div class="context-menu-item" data-action="pin">📌 Pin</div>
+        <div class="context-menu-item" data-action="unpin">📍 Unpin</div>
+        <div class="context-menu-sep"></div>
+        <div class="context-menu-item context-menu-danger" data-action="delete">✕ Delete</div>
+    </div>
+
+    <script src="/js/store.js"></script>
+    <script src="/js/api.js"></script>
+    <script src="/js/components.js"></script>
+    <script src="/js/graph.js"></script>
+    <script src="/js/grid.js"></script>
+    <script src="/js/player.js"></script>
+    <script src="/js/app.js"></script>
+    </div><!-- /app-wrapper -->
+</body>
+</html>
