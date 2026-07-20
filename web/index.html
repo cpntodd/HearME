@@ -95,12 +95,29 @@
                             <button class="detail-filter-tab" data-preset="bars">Bars+Beads</button>
                         </div>
                     </div>
-                    <!-- Right: Playlist -->
+                    <!-- Right: Playlist / Library -->
                     <div class="player-right">
                         <div class="panel inset" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
-                            <div class="panel-header">Playlist</div>
-                            <div id="player-playlist" class="player-playlist">
-                                <div class="player-playlist-empty">Queue is empty.<br>Browse Jellyfin to add tracks.</div>
+                            <div class="player-right-tabs">
+                                <button class="player-right-tab active" data-panel="playlist">Playlist</button>
+                                <button class="player-right-tab" data-panel="library">Library</button>
+                            </div>
+                            <!-- Playlist Panel -->
+                            <div class="player-right-panel active" id="panel-playlist">
+                                <div id="player-playlist" class="player-playlist">
+                                    <div class="player-playlist-empty">Queue is empty.<br>Browse Library to add tracks.</div>
+                                </div>
+                            </div>
+                            <!-- Library Panel -->
+                            <div class="player-right-panel" id="panel-library">
+                                <div class="library-nav">
+                                    <button id="lib-back" class="player-ctrl-btn" title="Back" style="font-size:12px;padding:1px 6px">◀</button>
+                                    <span id="lib-breadcrumb" class="library-breadcrumb">All Artists</span>
+                                    <input type="text" id="lib-search" class="input" placeholder="Filter..." style="flex:1;height:20px;font-size:10px;padding:1px 4px">
+                                </div>
+                                <div id="lib-content" class="library-content">
+                                    <div class="library-loading">Loading library...</div>
+                                </div>
                             </div>
                         </div>
                     </div>

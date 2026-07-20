@@ -77,6 +77,9 @@ func New(cfg *config.Config, webFS fs.FS, artistAgg *artists.Aggregator, tourAgg
 	mux.HandleFunc("/api/jellyfin/search", s.handleJellyfinSearch)
 	mux.HandleFunc("/api/jellyfin/stream/", s.handleJellyfinStream)
 	mux.HandleFunc("/api/jellyfin/status", s.handleJellyfinStatus)
+	mux.HandleFunc("/api/jellyfin/library/artists", s.handleJellyfinArtists)
+	mux.HandleFunc("/api/jellyfin/library/albums", s.handleJellyfinAlbums)
+	mux.HandleFunc("/api/jellyfin/library/tracks", s.handleJellyfinTracks)
 
 	// Static file server for embedded frontend
 	mux.Handle("/", http.FileServer(http.FS(webFS)))
@@ -655,6 +658,104 @@ func (s *Server) handleJellyfinStream(w http.ResponseWriter, r *http.Request) {
 	}
 	streamURL := s.jellyfin.StreamURL(itemID)
 	http.Redirect(w, r, streamURL, http.StatusTemporaryRedirect)
+}
+
+func (s *Server) handleJellyfinArtists(w http.ResponseWriter, r *http.Request) {
+	if !s.jellyfin.Enabled() {
+		s.writeJSONError(w, http.StatusServiceUnavailable, "Jellyfin not configured")
+		return
+	}
+	items, err := s.jellyfin.GetArtists()
+	if err != nil {
+		s.writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	type artistResult struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		ImageURL string `json:"imageUrl,omitempty"`
+	}
+	results := make([]artistResult, 0, len(items))
+	for _, item := range items {
+		imgURL := ""
+		if len(item.ImageTags) > 0 {
+			imgURL = s.jellyfin.ImageURL(item.ID)
+		}
+		results = append(results, artistResult{
+			ID: item.ID, Name: item.Name, ImageURL: imgURL,
+		})
+	}
+	s.writeJSON(w, http.StatusOK, results)
+}
+
+func (s *Server) handleJellyfinAlbums(w http.ResponseWriter, r *http.Request) {
+	if !s.jellyfin.Enabled() {
+		s.writeJSONError(w, http.StatusServiceUnavailable, "Jellyfin not configured")
+		return
+	}
+	artistID := r.URL.Query().Get("artistId")
+	items, err := s.jellyfin.GetAlbums(artistID)
+	if err != nil {
+		s.writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	type albumResult struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Artist   string `json:"artist"`
+		Year     int    `json:"year"`
+		ImageURL string `json:"imageUrl,omitempty"`
+	}
+	results := make([]albumResult, 0, len(items))
+	for _, item := range items {
+		imgURL := ""
+		if len(item.ImageTags) > 0 {
+			imgURL = s.jellyfin.ImageURL(item.ID)
+		}
+		results = append(results, albumResult{
+			ID: item.ID, Name: item.Name, Artist: item.AlbumArtist,
+			Year: item.ProductionYear, ImageURL: imgURL,
+		})
+	}
+	s.writeJSON(w, http.StatusOK, results)
+}
+
+func (s *Server) handleJellyfinTracks(w http.ResponseWriter, r *http.Request) {
+	if !s.jellyfin.Enabled() {
+		s.writeJSONError(w, http.StatusServiceUnavailable, "Jellyfin not configured")
+		return
+	}
+	albumID := r.URL.Query().Get("albumId")
+	if albumID == "" {
+		s.writeJSONError(w, http.StatusBadRequest, "albumId parameter required")
+		return
+	}
+	items, err := s.jellyfin.GetTracks(albumID)
+	if err != nil {
+		s.writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	type trackResult struct {
+		ID       string `json:"id"`
+		Title    string `json:"title"`
+		Artist   string `json:"artist"`
+		Album    string `json:"album"`
+		TrackNum int    `json:"trackNum"`
+		Duration int    `json:"duration"`
+	}
+	results := make([]trackResult, 0, len(items))
+	for _, item := range items {
+		dur := int(item.RunTimeTicks / 10000000)
+		artist := item.AlbumArtist
+		if artist == "" && len(item.Artists) > 0 {
+			artist = item.Artists[0]
+		}
+		results = append(results, trackResult{
+			ID: item.ID, Title: item.Name, Artist: artist,
+			Album: item.Album, TrackNum: item.IndexNumber, Duration: dur,
+		})
+	}
+	s.writeJSON(w, http.StatusOK, results)
 }
 
 // --- JSON helpers ---

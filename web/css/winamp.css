@@ -1793,3 +1793,193 @@ html, body {
     color: var(--text-secondary);
     margin-bottom: 1px;
 }
+
+/* ================================================================
+   Media Library (right panel tabs)
+   ================================================================ */
+.player-right-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--chrome-dark);
+    flex-shrink: 0;
+}
+
+.player-right-tab {
+    flex: 1;
+    padding: 3px 8px;
+    font-size: 10px;
+    background: var(--bg-panel);
+    color: var(--text-dim);
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-ui);
+    text-align: center;
+}
+
+.player-right-tab.active {
+    background: var(--bg-surface);
+    color: var(--green);
+    font-weight: bold;
+    border-bottom: 2px solid var(--green);
+}
+
+.player-right-panel {
+    display: none;
+    flex: 1;
+    overflow: hidden;
+    flex-direction: column;
+}
+
+.player-right-panel.active {
+    display: flex;
+}
+
+/* Library browser */
+.library-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px;
+    border-bottom: 1px solid var(--chrome-shadow);
+    flex-shrink: 0;
+}
+
+.library-breadcrumb {
+    font-size: 10px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 60px;
+    cursor: default;
+}
+
+.library-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
+}
+
+.library-loading {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-dim);
+    font-size: 11px;
+}
+
+/* Album/Artist grid */
+.library-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 6px;
+}
+
+.library-card {
+    cursor: pointer;
+    text-align: center;
+    padding: 4px;
+    border: 1px solid transparent;
+    border-radius: 0;
+    transition: border-color 0.1s;
+}
+
+.library-card:hover {
+    border-color: var(--green);
+    background: var(--bg-row-hover);
+}
+
+.library-card-img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    background: var(--bg-input);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    color: var(--text-dim);
+}
+
+.library-card-name {
+    font-size: 10px;
+    color: var(--text);
+    margin-top: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.library-card-sub {
+    font-size: 9px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Track list */
+.library-track-list {
+    width: 100%;
+}
+
+.library-track {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 4px;
+    cursor: pointer;
+    font-size: 11px;
+    border-bottom: 1px solid var(--chrome-shadow);
+}
+
+.library-track:hover {
+    background: var(--bg-row-hover);
+}
+
+.library-track-num {
+    width: 22px;
+    text-align: right;
+    color: var(--text-dim);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.library-track-title {
+    flex: 1;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.library-track-artist {
+    width: 80px;
+    color: var(--text-dim);
+    font-size: 10px;
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+.library-track-dur {
+    width: 36px;
+    text-align: right;
+    color: var(--text-dim);
+    font-size: 10px;
+    flex-shrink: 0;
+}
+
+.library-track-btn {
+    width: 18px;
+    text-align: center;
+    color: var(--green);
+    cursor: pointer;
+    font-size: 12px;
+    flex-shrink: 0;
+    visibility: hidden;
+}
+
+.library-track:hover .library-track-btn {
+    visibility: visible;
+}

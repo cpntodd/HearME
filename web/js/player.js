@@ -20,6 +20,11 @@ const Player = {
     _balance: 0,
     _eqGains: [0,0,0,0,0,0,0,0,0,0],
 
+    // Library state
+    _libView: 'artists', // 'artists', 'albums', 'tracks'
+    _libParentId: null,
+    _libParentName: '',
+
     // VFD state
     vfdText: 'HEARME  READY',
     vfdScroll: 0,
@@ -66,6 +71,9 @@ const Player = {
 
         // Start VFD + VU render loop
         this._renderDisplays();
+
+        // Library panel
+        this._initLibrary();
     },
 
     async loadTrack(url, metadata) {
@@ -639,5 +647,224 @@ const Player = {
             if (vals[i]) vals[i].textContent = (g > 0 ? '+' : '') + g + 'dB';
         });
         this._updateEQFilters();
+    },
+
+    // ====================================================================
+    //  Media Library Browser
+    // ====================================================================
+
+    _initLibrary() {
+        // Right panel tab switching
+        document.querySelectorAll('.player-right-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.player-right-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const panelId = 'panel-' + tab.dataset.panel;
+                document.querySelectorAll('.player-right-panel').forEach(p => p.classList.remove('active'));
+                document.getElementById(panelId).classList.add('active');
+                if (tab.dataset.panel === 'library') {
+                    this._loadLibrary();
+                }
+            });
+        });
+
+        // Back button
+        document.getElementById('lib-back').addEventListener('click', () => this._libGoBack());
+
+        // Search filter
+        document.getElementById('lib-search').addEventListener('input', (e) => {
+            this._libFilter(e.target.value);
+        });
+    },
+
+    async _loadLibrary() {
+        if (this._libView === 'artists' && !this._libArtistsCache) {
+            await this._loadArtists();
+        }
+    },
+
+    _libGoBack() {
+        if (this._libView === 'albums') {
+            this._libView = 'artists';
+            this._libParentId = null;
+            this._libParentName = '';
+            document.getElementById('lib-breadcrumb').textContent = 'All Artists';
+            this._renderLibrary();
+        } else if (this._libView === 'tracks') {
+            this._libView = 'albums';
+            document.getElementById('lib-breadcrumb').textContent = this._libParentName;
+            this._renderAlbums(this._libAlbumsCache || []);
+        }
+    },
+
+    _libFilter(query) {
+        const q = query.toLowerCase();
+        const cards = document.querySelectorAll('.library-card');
+        const tracks = document.querySelectorAll('.library-track');
+        cards.forEach(c => {
+            const name = (c.querySelector('.library-card-name')?.textContent || '').toLowerCase();
+            const sub = (c.querySelector('.library-card-sub')?.textContent || '').toLowerCase();
+            c.style.display = (!q || name.includes(q) || sub.includes(q)) ? '' : 'none';
+        });
+        tracks.forEach(t => {
+            const title = (t.querySelector('.library-track-title')?.textContent || '').toLowerCase();
+            t.style.display = (!q || title.includes(q)) ? '' : 'none';
+        });
+    },
+
+    async _loadArtists() {
+        const content = document.getElementById('lib-content');
+        content.innerHTML = '<div class="library-loading">Loading artists...</div>';
+        try {
+            const resp = await fetch('/api/jellyfin/library/artists');
+            if (!resp.ok) throw new Error('Failed to load artists');
+            const data = await resp.json();
+            this._libArtistsCache = data;
+            this._renderArtists(data);
+        } catch (err) {
+            content.innerHTML = '<div class="library-loading" style="color:var(--error)">⚠ Failed to load artists.<br>Check Jellyfin connection.</div>';
+        }
+    },
+
+    async _loadAlbums(artistId, artistName) {
+        const content = document.getElementById('lib-content');
+        content.innerHTML = '<div class="library-loading">Loading albums...</div>';
+        try {
+            const url = '/api/jellyfin/library/albums' + (artistId ? '?artistId=' + artistId : '');
+            const resp = await fetch(url);
+            if (!resp.ok) throw new Error('Failed to load albums');
+            const data = await resp.json();
+            this._libAlbumsCache = data;
+            this._libView = 'albums';
+            this._libParentId = artistId;
+            this._libParentName = artistName;
+            document.getElementById('lib-breadcrumb').textContent = artistName;
+            this._renderAlbums(data);
+        } catch (err) {
+            content.innerHTML = '<div class="library-loading" style="color:var(--error)">⚠ Failed to load albums.</div>';
+        }
+    },
+
+    async _loadTracks(albumId, albumName) {
+        const content = document.getElementById('lib-content');
+        content.innerHTML = '<div class="library-loading">Loading tracks...</div>';
+        try {
+            const resp = await fetch('/api/jellyfin/library/tracks?albumId=' + albumId);
+            if (!resp.ok) throw new Error('Failed to load tracks');
+            const data = await resp.json();
+            this._libView = 'tracks';
+            document.getElementById('lib-breadcrumb').textContent = albumName;
+            this._renderTracks(data);
+        } catch (err) {
+            content.innerHTML = '<div class="library-loading" style="color:var(--error)">⚠ Failed to load tracks.</div>';
+        }
+    },
+
+    _renderLibrary() {
+        if (this._libView === 'artists') {
+            this._renderArtists(this._libArtistsCache || []);
+        } else if (this._libView === 'albums') {
+            this._renderAlbums(this._libAlbumsCache || []);
+        }
+    },
+
+    _renderArtists(data) {
+        const content = document.getElementById('lib-content');
+        if (!data.length) {
+            content.innerHTML = '<div class="library-loading">No artists found.</div>';
+            return;
+        }
+        let html = '<div class="library-grid">';
+        data.forEach(a => {
+            const img = a.imageUrl
+                ? `<img class="library-card-img" src="${a.imageUrl}" alt="" loading="lazy" onerror="this.textContent='🎤'">`
+                : '<span class="library-card-img">🎤</span>';
+            html += `<div class="library-card" data-id="${a.id}" data-name="${a.name}" data-type="artist">
+                ${img}
+                <div class="library-card-name">${this._esc(a.name)}</div>
+                <div class="library-card-sub">Artist</div>
+            </div>`;
+        });
+        html += '</div>';
+        content.innerHTML = html;
+        content.querySelectorAll('.library-card').forEach(card => {
+            card.addEventListener('click', () => {
+                this._loadAlbums(card.dataset.id, card.dataset.name);
+            });
+        });
+    },
+
+    _renderAlbums(data) {
+        const content = document.getElementById('lib-content');
+        if (!data.length) {
+            content.innerHTML = '<div class="library-loading">No albums found.</div>';
+            return;
+        }
+        let html = '<div class="library-grid">';
+        data.forEach(a => {
+            const img = a.imageUrl
+                ? `<img class="library-card-img" src="${a.imageUrl}" alt="" loading="lazy" onerror="this.textContent='💿'">`
+                : '<span class="library-card-img">💿</span>';
+            html += `<div class="library-card" data-id="${a.id}" data-name="${a.name}" data-type="album">
+                ${img}
+                <div class="library-card-name">${this._esc(a.name)}</div>
+                <div class="library-card-sub">${a.year || ''} ${a.artist ? '· '+this._esc(a.artist) : ''}</div>
+            </div>`;
+        });
+        html += '</div>';
+        content.innerHTML = html;
+        content.querySelectorAll('.library-card').forEach(card => {
+            card.addEventListener('click', () => {
+                this._loadTracks(card.dataset.id, card.dataset.name);
+            });
+        });
+    },
+
+    _renderTracks(data) {
+        const content = document.getElementById('lib-content');
+        if (!data.length) {
+            content.innerHTML = '<div class="library-loading">No tracks found.</div>';
+            return;
+        }
+        let html = '<div class="library-track-list">';
+        data.forEach(t => {
+            html += `<div class="library-track" data-id="${t.id}" data-title="${this._esc(t.title)}" data-artist="${this._esc(t.artist)}" data-album="${this._esc(t.album)}">
+                <span class="library-track-num">${t.trackNum || ''}</span>
+                <span class="library-track-title">${this._esc(t.title)}</span>
+                <span class="library-track-artist">${this._esc(t.artist)}</span>
+                <span class="library-track-dur">${this._fmtTime(t.duration)}</span>
+                <span class="library-track-btn" title="Add to queue">▶</span>
+            </div>`;
+        });
+        html += '</div>';
+        content.innerHTML = html;
+        // Click track → play stream
+        content.querySelectorAll('.library-track').forEach(row => {
+            const playBtn = row.querySelector('.library-track-btn');
+            playBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._queueAndPlay(row.dataset);
+            });
+            row.addEventListener('dblclick', () => {
+                this._queueAndPlay(row.dataset);
+            });
+        });
+    },
+
+    _queueAndPlay(track) {
+        const streamUrl = '/api/jellyfin/stream/' + track.id;
+        const metadata = {
+            title: track.title,
+            artist: track.artist,
+            album: track.album,
+        };
+        // Add to playlist and play immediately
+        this.addToPlaylist([{ url: streamUrl, title: track.title, artist: track.artist, album: track.album }]);
+        this.playlistIndex = this.playlist.length - 1;
+        this.loadTrack(streamUrl, metadata);
+    },
+
+    _esc(s) {
+        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     },
 };
