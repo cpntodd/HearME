@@ -74,6 +74,59 @@ const Player = {
 
         // Library panel
         this._initLibrary();
+
+        // Right panel resize grip
+        this._initResizeGrip();
+    },
+
+    _initResizeGrip() {
+        const grip = document.getElementById('player-resize-grip');
+        const panel = document.getElementById('player-right-panel');
+        if (!grip || !panel) return;
+        let dragging = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        grip.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dragging = true;
+            startX = e.clientX;
+            startWidth = panel.offsetWidth;
+            grip.classList.add('active');
+            document.body.style.userSelect = 'none';
+            document.body.style.cursor = 'ew-resize';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!dragging) return;
+            const dx = startX - e.clientX; // leftward = wider
+            const newWidth = Math.min(480, Math.max(140, startWidth + dx));
+            panel.style.width = newWidth + 'px';
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (dragging) {
+                dragging = false;
+                grip.classList.remove('active');
+                document.body.style.userSelect = '';
+                document.body.style.cursor = '';
+                // Save preference
+                if (panel.style.width) {
+                    const settings = JSON.parse(localStorage.getItem('hearme_settings') || '{}');
+                    settings.playerPanelWidth = panel.style.width;
+                    localStorage.setItem('hearme_settings', JSON.stringify(settings));
+                }
+            }
+        });
+
+        // Restore saved width
+        try {
+            const settings = JSON.parse(localStorage.getItem('hearme_settings') || '{}');
+            if (settings.playerPanelWidth) {
+                panel.style.width = settings.playerPanelWidth;
+            }
+        } catch {}
     },
 
     async loadTrack(url, metadata) {

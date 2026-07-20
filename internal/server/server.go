@@ -52,10 +52,10 @@ func New(cfg *config.Config, webFS fs.FS, artistAgg *artists.Aggregator, tourAgg
 
 	// Init Jellyfin client if configured
 	if s.jellyfin.Enabled() {
-		if _, err := s.jellyfin.GetUserID(); err != nil {
-			log.Printf("jellyfin: auth failed: %v", err)
+		if id, err := s.jellyfin.GetUserID(); err != nil {
+			log.Printf("jellyfin: user lookup failed: %v (library browse may still work)", err)
 		} else {
-			log.Printf("jellyfin: connected to %s", cfg.JellyfinURL)
+			log.Printf("jellyfin: connected to %s (user %s)", cfg.JellyfinURL, id)
 		}
 	}
 

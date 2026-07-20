@@ -1607,9 +1607,38 @@ html, body {
 
 .player-right {
     width: 200px;
+    min-width: 140px;
+    max-width: 480px;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
+}
+
+.player-resize-grip {
+    width: 5px;
+    flex-shrink: 0;
+    cursor: ew-resize;
+    background: transparent;
+    transition: background 0.15s;
+    position: relative;
+}
+
+.player-resize-grip:hover,
+.player-resize-grip.active {
+    background: var(--green-dark);
+    opacity: 0.4;
+}
+
+.player-resize-grip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 30px;
+    background: var(--chrome-dark);
+    border-radius: 1px;
 }
 
 .player-playlist {

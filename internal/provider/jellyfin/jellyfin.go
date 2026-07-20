@@ -35,17 +35,6 @@ func (c *Client) Enabled() bool {
 	return c.baseURL != "" && c.apiKey != ""
 }
 
-// authHeaderValue builds the X-Emby-Authorization header value.
-func (c *Client) authHeaderValue() string {
-	token := c.apiKey
-	if c.token != "" {
-		token = c.token
-	}
-	return fmt.Sprintf(
-		`MediaBrowser Client="HearME", Device="PC", DeviceId="hearme-01", Version="0.1.0", Token="%s"`,
-		token)
-}
-
 // do sends an authenticated GET request and unmarshals the JSON response.
 func (c *Client) do(path string, result any) error {
 	u := c.baseURL + path
@@ -53,7 +42,7 @@ func (c *Client) do(path string, result any) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("X-Emby-Authorization", c.authHeaderValue())
+	req.Header.Set("X-MediaBrowser-Token", c.apiKey)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.client.Do(req)
@@ -95,18 +84,27 @@ type JFMediaSource struct {
 	Size      int64  `json:"Size"`
 }
 
+// usersPath returns the prefix for user-scoped endpoints.
+func (c *Client) usersPath() string {
+	if c.userID != "" {
+		return "/Users/" + c.userID
+	}
+	return ""
+}
+
 // GetArtists returns all music artists.
 func (c *Client) GetArtists() ([]JFItem, error) {
 	var result struct {
 		Items []JFItem `json:"Items"`
 	}
-	err := c.do("/Artists?Recursive=true&IncludeItemTypes=MusicArtist", &result)
+	// Use Items endpoint — /Artists can be empty depending on library setup
+	err := c.do(c.usersPath()+"/Items?Recursive=true&IncludeItemTypes=MusicArtist&SortBy=SortName", &result)
 	return result.Items, err
 }
 
 // GetAlbums returns all music albums, optionally filtered by artist.
 func (c *Client) GetAlbums(artistID string) ([]JFItem, error) {
-	path := "/Users/" + c.userID + "/Items?Recursive=true&IncludeItemTypes=MusicAlbum&SortBy=SortName"
+	path := c.usersPath() + "/Items?Recursive=true&IncludeItemTypes=MusicAlbum&SortBy=SortName&Limit=200"
 	if artistID != "" {
 		path += "&ArtistIds=" + artistID
 	}
@@ -119,7 +117,7 @@ func (c *Client) GetAlbums(artistID string) ([]JFItem, error) {
 
 // GetTracks returns tracks for a given album.
 func (c *Client) GetTracks(albumID string) ([]JFItem, error) {
-	path := "/Users/" + c.userID + "/Items?ParentId=" + albumID + "&IncludeItemTypes=Audio&SortBy=IndexNumber"
+	path := c.usersPath() + "/Items?ParentId=" + albumID + "&IncludeItemTypes=Audio&SortBy=IndexNumber"
 	var result struct {
 		Items []JFItem `json:"Items"`
 	}
@@ -129,8 +127,8 @@ func (c *Client) GetTracks(albumID string) ([]JFItem, error) {
 
 // Search finds items matching a query.
 func (c *Client) Search(query string) ([]JFItem, error) {
-	path := fmt.Sprintf("/Users/%s/Items?SearchTerm=%s&Recursive=true&IncludeItemTypes=Audio&Limit=50",
-		c.userID, url.QueryEscape(query))
+	path := fmt.Sprintf("%s/Items?SearchTerm=%s&Recursive=true&IncludeItemTypes=Audio&Limit=50",
+		c.usersPath(), url.QueryEscape(query))
 	var result struct {
 		Items []JFItem `json:"Items"`
 	}
@@ -171,17 +169,33 @@ func (c *Client) GetViewID() (string, error) {
 }
 
 // GetUserID retrieves the user ID via API key auth.
+// Tries /Users/Me first, falls back to /Users (list).
 func (c *Client) GetUserID() (string, error) {
+	// Try /Users/Me
 	var result struct {
 		ID   string `json:"Id"`
 		Name string `json:"Name"`
 	}
 	err := c.do("/Users/Me", &result)
-	if err != nil {
-		return "", err
+	if err == nil && result.ID != "" {
+		c.userID = result.ID
+		return result.ID, nil
 	}
-	c.userID = result.ID
-	return result.ID, nil
+
+	// Fallback: list all users and take the first one
+	var users []struct {
+		ID   string `json:"Id"`
+		Name string `json:"Name"`
+	}
+	err = c.do("/Users", &users)
+	if err != nil {
+		return "", fmt.Errorf("cannot get user: %w", err)
+	}
+	if len(users) == 0 {
+		return "", fmt.Errorf("no users found")
+	}
+	c.userID = users[0].ID
+	return c.userID, nil
 }
 
 // Authenticate logs in and obtains a token (alternative to API key).
