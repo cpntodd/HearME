@@ -22,8 +22,33 @@ const App = {
         this._bindDetailPanel();
         this._restoreState();
         this._updateArtistList();
+        this._loadOwnedArtists(); // async — loads Jellyfin collection for graph/tour badges
 
         document.getElementById('status-text').textContent = 'Ready';
+    },
+
+    // --- Owned Artists (Jellyfin cross-reference) ---
+    _ownedArtists: new Set(),
+    _ownedLoaded: false,
+
+    async _loadOwnedArtists() {
+        try {
+            const resp = await fetch('/api/jellyfin/library/owned');
+            const data = await resp.json();
+            if (data.names) {
+                this._ownedArtists = new Set(data.names.map(n => n.toLowerCase()));
+                this._ownedLoaded = true;
+                // Update status bar
+                const count = document.getElementById('status-node-count');
+                if (count) count.textContent += ` · ${data.names.length} owned`;
+            }
+        } catch {
+            // non-critical — owned badges just won't show
+        }
+    },
+
+    isArtistOwned(name) {
+        return this._ownedArtists.has((name || '').toLowerCase());
     },
 
     // --- Tab Switching ---

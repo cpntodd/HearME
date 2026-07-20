@@ -173,7 +173,7 @@
                 </div>
             </div>
             <!-- Graph Explorer View -->
-            <div class="view active" id="view-graph">
+            <div class="view" id="view-graph">
                 <div class="graph-layout">
                     <div class="graph-sidebar">
                         <div class="panel inset" id="artist-search-panel">
@@ -279,6 +279,7 @@
                         <thead>
                             <tr>
                                 <th class="sortable" data-sort="artistName">Artist</th>
+                                <th style="width:20px" title="In Jellyfin library">🎵</th>
                                 <th class="sortable" data-sort="tourName">Tour</th>
                                 <th class="sortable" data-sort="date">Date</th>
                                 <th>City</th>
@@ -289,7 +290,7 @@
                         </thead>
                         <tbody id="tour-table-body">
                             <tr class="tour-empty">
-                                <td colspan="7">No tours to display. Select artists in the Graph Explorer and check "Show in Tour Grid".</td>
+                                <td colspan="8">No tours to display. Select artists in the Graph Explorer and check "Show in Tour Grid".</td>
                             </tr>
                         </tbody>
                     </table>

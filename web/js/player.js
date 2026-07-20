@@ -31,6 +31,7 @@ const Player = {
 
     init() {
         document.getElementById('btn-play').addEventListener('click', () => this.togglePlay());
+        document.getElementById('btn-stop').addEventListener('click', () => this.stop());
         document.getElementById('btn-prev').addEventListener('click', () => this.prev());
         document.getElementById('btn-next').addEventListener('click', () => this.next());
         document.getElementById('btn-shuffle').addEventListener('click', () => {
@@ -46,18 +47,36 @@ const Player = {
             btn.style.color = this.repeat !== 'off' ? 'var(--green)' : '';
         });
 
+        // Seek bar — seek via audio element
         const seek = document.getElementById('player-seek');
         seek.addEventListener('input', () => {
-            if (this.audioCtx && this.currentTrack) {
-                // Seeking not directly supported with MediaElementSource; will use audio element
+            if (this.audioEl) {
+                this.audioEl.currentTime = parseFloat(seek.value);
             }
         });
 
+        // Volume
         const volume = document.getElementById('player-volume');
         volume.addEventListener('input', () => {
-            if (this.gainNode) {
-                this.gainNode.gain.value = volume.value / 100;
-            }
+            this._vol = volume.value / 100;
+            if (this.gainNode) this.gainNode.gain.value = this._vol;
+        });
+
+        // Balance
+        const balance = document.getElementById('player-balance');
+        balance.addEventListener('input', () => {
+            this._balance = parseInt(balance.value) / 100;
+            this._applyBalance();
+        });
+
+        // Equalizer
+        this._buildEQ();
+        document.getElementById('player-eq-preset').addEventListener('change', (e) => {
+            this._applyEQPreset(e.target.value);
+        });
+        document.getElementById('btn-eq-toggle').addEventListener('click', () => {
+            const bands = document.getElementById('player-eq-bands');
+            bands.style.display = bands.style.display === 'none' ? 'flex' : 'none';
         });
 
         // Visualizer presets
@@ -507,60 +526,70 @@ const Player = {
     },
 
     _drawVU() {
-        const drawMeter = (canvasId, analyser) => {
+        const drawMeter = (canvasId, analyser, peakRef) => {
             const canvas = document.getElementById(canvasId);
             if (!canvas || !analyser) return;
             const ctx = canvas.getContext('2d');
             const w = canvas.width;
             const h = canvas.height;
-            const data = new Uint8Array(analyser.frequencyBinCount);
+
+            // Use fftSize for getByteTimeDomainData buffer (must match analyser setup)
+            const bufferLen = analyser.fftSize;
+            const data = new Uint8Array(bufferLen);
             analyser.getByteTimeDomainData(data);
 
-            // Compute RMS level
+            // Compute RMS level from time-domain samples
             let sum = 0;
             for (let i = 0; i < data.length; i++) {
-                const v = (data[i] - 128) / 128;
+                const v = (data[i] - 128) / 128; // normalize to [-1, 1]
                 sum += v * v;
             }
             const rms = Math.sqrt(sum / data.length);
-            const db = rms > 0.001 ? 20 * Math.log10(rms) : -60;
+            // Convert to dB, floor at -60
+            const db = rms > 0.00001 ? 20 * Math.log10(rms) : -60;
 
+            // Background
             ctx.fillStyle = '#0a0a0a';
             ctx.fillRect(0, 0, w, h);
 
-            // dB scale background
+            // dB scale: -60 to +3, teal gradient background
             const dbMin = -60, dbMax = 3;
             const dbRange = dbMax - dbMin;
-            for (let d = dbMin; d <= dbMax; d += 3) {
+            for (let d = dbMin; d <= dbMax; d += 6) {
                 const y = h - ((d - dbMin) / dbRange) * h;
-                ctx.fillStyle = d > 0 ? '#400' : '#333';
-                ctx.fillRect(0, y, w, 1);
-                ctx.fillStyle = '#666';
+                // Red zone above 0dB
+                ctx.fillStyle = d >= 0 ? 'rgba(255,60,60,0.2)' : 'rgba(0,200,220,0.08)';
+                ctx.fillRect(0, y - 1, w, 3);
+                ctx.fillStyle = d >= 0 ? '#f55' : '#555';
                 ctx.font = '7px monospace';
-                ctx.fillText(d.toString(), 2, y - 1);
+                ctx.textAlign = 'left';
+                ctx.fillText(d.toString(), 2, y + 2);
             }
 
-            // Needle
-            const needleY = h - ((Math.max(dbMin, Math.min(dbMax, db)) - dbMin) / dbRange) * h;
-            ctx.strokeStyle = '#ff4444';
-            ctx.lineWidth = 1;
-            ctx.beginPath();
-            ctx.moveTo(4, h - 4);
-            ctx.lineTo(w - 4, needleY);
-            ctx.stroke();
+            // Colored bar (teal gradient, turns yellow/orange/red as level increases)
+            const normalizedDb = (db - dbMin) / dbRange;
+            const barH = normalizedDb * h;
+            const barColor = normalizedDb > 0.85 ? '#ff4444' :  // red zone
+                             normalizedDb > 0.7  ? '#ffaa00' :  // orange
+                             normalizedDb > 0.5  ? '#ffee00' :  // yellow
+                             '#00e5ff';                           // teal
+            ctx.fillStyle = barColor;
+            ctx.fillRect(1, h - barH, w - 2, barH);
 
-            // Peak hold
-            const peakY = Math.min(needleY, this._vuPeak || h);
-            this._vuPeak = Math.min(needleY, (this._vuPeak || h) + 0.3);
-            ctx.fillStyle = '#ff4444';
-            ctx.fillRect(0, peakY, w, 1);
+            // Peak hold dot (decays slowly)
+            const peakDb = Math.max(db, (peakRef.val || -60) - 0.15);
+            peakRef.val = peakDb;
+            const peakY = h - ((peakDb - dbMin) / dbRange) * h;
+            ctx.fillStyle = normalizedDb > 0.85 ? '#ff0000' : '#ffffff';
+            ctx.fillRect(1, Math.max(0, peakY - 1), w - 2, 2);
         };
 
-        drawMeter('player-vu-left', this.analyserL);
-        drawMeter('player-vu-right', this.analyserR);
+        drawMeter('player-vu-left', this.analyserL, this._vuPeakL);
+        drawMeter('player-vu-right', this.analyserR, this._vuPeakR);
     },
 
-    _vuPeak: 0,
+    _vuPeakL: { val: -60 },
+    _vuPeakR: { val: -60 },
 
     _fmtTime(secs) {
         if (!secs || !isFinite(secs)) return '0:00';

@@ -80,6 +80,7 @@ func New(cfg *config.Config, webFS fs.FS, artistAgg *artists.Aggregator, tourAgg
 	mux.HandleFunc("/api/jellyfin/library/artists", s.handleJellyfinArtists)
 	mux.HandleFunc("/api/jellyfin/library/albums", s.handleJellyfinAlbums)
 	mux.HandleFunc("/api/jellyfin/library/tracks", s.handleJellyfinTracks)
+	mux.HandleFunc("/api/jellyfin/library/owned", s.handleJellyfinOwned)
 
 	// Static file server for embedded frontend
 	mux.Handle("/", http.FileServer(http.FS(webFS)))
@@ -756,6 +757,42 @@ func (s *Server) handleJellyfinTracks(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	s.writeJSON(w, http.StatusOK, results)
+}
+
+// handleJellyfinOwned returns deduplicated artist names from the user's library.
+// Used by the frontend to mark graph nodes and tour entries as "owned".
+func (s *Server) handleJellyfinOwned(w http.ResponseWriter, r *http.Request) {
+	if !s.jellyfin.Enabled() {
+		s.writeJSON(w, http.StatusOK, map[string]any{"names": []string{}, "message": "Jellyfin not configured"})
+		return
+	}
+	// Get all albums to extract unique album artists
+	items, err := s.jellyfin.GetAlbums("")
+	if err != nil {
+		s.writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	seen := make(map[string]bool)
+	names := make([]string, 0)
+	for _, item := range items {
+		name := item.AlbumArtist
+		if name == "" && len(item.Artists) > 0 {
+			name = item.Artists[0]
+		}
+		if name != "" && !seen[name] {
+			seen[name] = true
+			names = append(names, name)
+		}
+	}
+	// Also include artists from the artist list
+	artists, _ := s.jellyfin.GetArtists()
+	for _, a := range artists {
+		if a.Name != "" && !seen[a.Name] {
+			seen[a.Name] = true
+			names = append(names, a.Name)
+		}
+	}
+	s.writeJSON(w, http.StatusOK, map[string]any{"names": names, "count": len(names)})
 }
 
 // --- JSON helpers ---

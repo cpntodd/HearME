@@ -117,11 +117,15 @@ const Grid = {
         // Render table
         const tbody = document.getElementById('tour-table-body');
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr class="tour-empty"><td colspan="7">No tours to display. Select artists in the Graph Explorer and check "Show in Tour Grid".</td></tr>`;
+            tbody.innerHTML = `<tr class="tour-empty"><td colspan="8">No tours to display. Select artists in the Graph Explorer and check "Show in Tour Grid".</td></tr>`;
         } else {
-            tbody.innerHTML = filtered.map(t => `
+            tbody.innerHTML = filtered.map(t => {
+                const owned = (typeof App !== 'undefined' && App.isArtistOwned && App.isArtistOwned(t.artistName))
+                    ? '<span style="color:#22ff22" title="In your Jellyfin library">✓</span>' : '';
+                return `
                 <tr>
                     <td>${this._esc(t.artistName)}</td>
+                    <td style="text-align:center">${owned}</td>
                     <td>${this._esc(t.tourName || '—')}</td>
                     <td>${this._formatDate(t.date)}</td>
                     <td>${this._esc(t.city)}</td>
@@ -129,7 +133,8 @@ const Grid = {
                     <td>${this._esc(t.country)}</td>
                     <td>${t.ticketUrl ? `<a href="${this._esc(t.ticketUrl)}" target="_blank" rel="noopener" class="ticket-link">Tickets 🎫</a>` : '—'}</td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         document.getElementById('tour-count').textContent = `${filtered.length} tours`;

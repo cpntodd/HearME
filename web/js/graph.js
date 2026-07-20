@@ -442,6 +442,17 @@ const Graph = {
                 ctx.lineWidth = 0.5;
                 ctx.stroke();
             }
+
+            // Owned indicator (in Jellyfin library)
+            if (typeof App !== 'undefined' && App.isArtistOwned && App.isArtistOwned(node.artist.name)) {
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, r + 5, 0, Math.PI * 2);
+                ctx.strokeStyle = '#22ff22';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([2, 3]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
         }
 
         ctx.restore();
