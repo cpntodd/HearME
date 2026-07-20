@@ -277,14 +277,16 @@ const Player = {
     prev() { this._navigate(-1); },
 
     _navigate(dir) {
-        if (this.playlist.length === 0 || this._loading) return;
-        this._loading = true;
+        if (this.playlist.length === 0) return;
+        // Allow navigate even if _loading — cancel current load
+        this._loading = false;
         if (this.shuffle) {
             this.playlistIndex = Math.floor(Math.random() * this.playlist.length);
         } else {
             this.playlistIndex = (this.playlistIndex + dir + this.playlist.length) % this.playlist.length;
         }
         const track = this.playlist[this.playlistIndex];
+        this._loading = true;
         this.loadTrack(track.url, track).finally(() => {
             this._loading = false;
             this._updatePlaylistUI();

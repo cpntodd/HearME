@@ -13,7 +13,15 @@ const Graph = {
     isPanning: false,
     panStart: { x: 0, y: 0 },
     hoverNode: null,
-    maxNodes: 500,
+    maxNodes: 500, // default, overridden by user setting (0 = unlimited)
+
+    _getMaxNodes() {
+        try {
+            const s = JSON.parse(localStorage.getItem('hearme_settings') || '{}');
+            const val = parseInt(s.maxGraphNodes);
+            return (val > 0) ? val : Infinity;
+        } catch { return Infinity; }
+    },
 
     // Simulation constants
     repulsion: 5000,
@@ -75,8 +83,8 @@ const Graph = {
     // --- Node Management ---
 
     addNode(artist, x, y) {
-        // Check cap
-        if (this.nodes.length >= this.maxNodes) {
+        const limit = this._getMaxNodes();
+        if (this.nodes.length >= limit && limit !== Infinity) {
             document.getElementById('graph-warning').classList.remove('hidden');
             return false;
         }
@@ -126,7 +134,7 @@ const Graph = {
         parentNode.expanded = true;
 
         for (const rel of relations) {
-            if (this.nodes.length >= this.maxNodes) {
+            if (this.nodes.length >= this._getMaxNodes() && this._getMaxNodes() !== Infinity) {
                 document.getElementById('graph-warning').classList.remove('hidden');
                 break;
             }

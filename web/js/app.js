@@ -354,8 +354,9 @@ const App = {
             if (imported > 0) {
                 this._updateArtistList();
                 Components.toast(`Imported ${imported} artists from library.`, 'info');
-                // Auto-expand first 3 to seed the graph
-                const toExpand = Graph.nodes.filter(n => !n.expanded).slice(0, 3);
+                // Auto-expand based on user setting (default 5)
+                const batchSize = parseInt(Store.getSettings().autoExpandCount || 5);
+                const toExpand = Graph.nodes.filter(n => !n.expanded).slice(0, batchSize);
                 for (const node of toExpand) {
                     await this._expandArtist(node.artist);
                 }
@@ -1184,7 +1185,28 @@ const App = {
                 this._loadCustomFont(fontUrl);
                 Components.toast('Custom font loaded.', 'info');
             }
+            // Save graph settings
+            this._saveGraphSettings();
         });
+
+        // Graph settings
+        document.getElementById('setting-max-nodes').addEventListener('change', () => this._saveGraphSettings());
+        document.getElementById('setting-auto-expand').addEventListener('change', () => this._saveGraphSettings());
+        this._loadGraphSettings();
+    },
+
+    _loadGraphSettings() {
+        const s = Store.getSettings();
+        document.getElementById('setting-max-nodes').value = s.maxGraphNodes || 500;
+        document.getElementById('setting-auto-expand').value = s.autoExpandCount || 5;
+    },
+
+    _saveGraphSettings() {
+        const s = Store.getSettings();
+        s.maxGraphNodes = parseInt(document.getElementById('setting-max-nodes').value) || 0;
+        s.autoExpandCount = parseInt(document.getElementById('setting-auto-expand').value) || 5;
+        Store.setSettings(s);
+        Components.toast('Graph settings saved.', 'info');
     },
 
     // --- Titlebar Buttons ---
