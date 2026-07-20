@@ -879,6 +879,58 @@ const App = {
                 Components.toast('Failed to update settings.', 'error');
             }
         });
+
+        // --- Audio Player settings ---
+        this._loadAudioSettings();
+        document.getElementById('setting-viz-preset').addEventListener('change', (e) => {
+            Player.preset = e.target.value;
+            this._saveAudioSettings();
+        });
+        document.getElementById('setting-show-lyrics').addEventListener('change', (e) => {
+            const lyrics = document.getElementById('player-lyrics');
+            if (e.target.checked) {
+                lyrics.classList.remove('hidden');
+                this._fetchLyrics();
+            } else {
+                lyrics.classList.add('hidden');
+            }
+            this._saveAudioSettings();
+        });
+    },
+
+    _loadAudioSettings() {
+        const s = Store.getSettings();
+        const preset = s.vizPreset || 'spectrum';
+        document.getElementById('setting-viz-preset').value = preset;
+        Player.preset = preset;
+        document.getElementById('setting-show-lyrics').checked = s.showLyrics || false;
+        if (s.showLyrics) document.getElementById('player-lyrics').classList.remove('hidden');
+    },
+
+    _saveAudioSettings() {
+        const s = Store.getSettings();
+        s.vizPreset = document.getElementById('setting-viz-preset').value;
+        s.showLyrics = document.getElementById('setting-show-lyrics').checked;
+        Store.setSettings(s);
+    },
+
+    _fetchLyrics() {
+        if (!Player.currentTrack) return;
+        const artist = Player.currentTrack.artist;
+        const title = Player.currentTrack.title;
+        if (!artist || !title) return;
+        fetch(`/api/lyrics/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`)
+            .then(r => r.json())
+            .then(data => {
+                const el = document.getElementById('player-lyrics-text');
+                if (data.lyrics) {
+                    el.textContent = data.lyrics;
+                } else {
+                    el.textContent = 'No lyrics found.';
+                }
+            }).catch(() => {
+                document.getElementById('player-lyrics-text').textContent = 'Lyrics unavailable.';
+            });
     },
 
     async _loadSettings() {

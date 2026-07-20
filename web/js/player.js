@@ -21,6 +21,10 @@ const Player = {
     _eqGains: [0,0,0,0,0,0,0,0,0,0],
     _loading: false,
 
+    // Album context for "play from album" behavior
+    _currentAlbumTracks: null,
+    _currentAlbumId: null,
+
     // Library state
     _libView: 'artists', // 'artists', 'albums', 'tracks'
     _libParentId: null,
@@ -913,9 +917,20 @@ const Player = {
             const playBtn = row.querySelector('.library-track-btn');
             playBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                this._queueAndPlay(row.dataset);
+                // If browsing an album, play from this track within the album
+                if (this._currentAlbumTracks && this._currentAlbumTracks.length > 0) {
+                    this._playFromTrack(row.dataset, this._currentAlbumTracks);
+                } else {
+                    this._queueAndPlay(row.dataset);
+                }
             });
-            row.addEventListener('dblclick', () => this._queueAndPlay(row.dataset));
+            row.addEventListener('dblclick', () => {
+                if (this._currentAlbumTracks && this._currentAlbumTracks.length > 0) {
+                    this._playFromTrack(row.dataset, this._currentAlbumTracks);
+                } else {
+                    this._queueAndPlay(row.dataset);
+                }
+            });
         });
     },
 
@@ -925,13 +940,65 @@ const Player = {
         try {
             const resp = await fetch('/api/jellyfin/library/tracks?albumId=' + albumId);
             const data = await resp.json();
-            // Add breadcrumb-like header
+            // Store album context for "play album" behavior
+            this._currentAlbumTracks = data.map(t => ({...t, albumName}));
+            this._currentAlbumId = albumId;
             content.innerHTML = '<div style="padding:4px 8px;font-size:10px;color:var(--text-dim);margin-bottom:4px">' +
-                '💿 ' + this._esc(albumName) + '</div>';
+                '💿 ' + this._esc(albumName) + ' <span style="color:var(--green);cursor:pointer" id="lib-play-album">▶ Play Album</span></div>';
             this._renderTracksList(data);
+            // Play entire album button
+            document.getElementById('lib-play-album')?.addEventListener('click', () => {
+                this._playAlbum(data, albumName);
+            });
         } catch {
             content.innerHTML = '<div class="library-loading">Failed to load tracks.</div>';
         }
+    },
+
+    _playAlbum(tracks, albumName) {
+        // Add all tracks to queue, start from first
+        const resolved = [];
+        Promise.all(tracks.map(async (t, i) => {
+            const resp = await fetch('/api/jellyfin/stream/' + t.id);
+            const data = await resp.json();
+            resolved[i] = {
+                url: data.url,
+                title: t.title,
+                artist: t.artist,
+                album: albumName || t.album,
+            };
+        })).then(() => {
+            // Clear queue and add all resolved tracks
+            this.playlist = resolved.filter(Boolean);
+            this.playlistIndex = 0;
+            this._updatePlaylistUI();
+            if (this.playlist.length > 0) {
+                this.loadTrack(this.playlist[0].url, this.playlist[0]);
+            }
+        });
+    },
+
+    _playFromTrack(trackData, allTracks) {
+        // Add all album tracks to queue, start from the clicked track
+        const startIdx = allTracks.findIndex(t => t.id === trackData.id);
+        Promise.all(allTracks.map(async (t) => {
+            const resp = await fetch('/api/jellyfin/stream/' + t.id);
+            const data = await resp.json();
+            return {
+                url: data.url,
+                title: t.title,
+                artist: t.artist,
+                album: t.album || t.albumName || '',
+            };
+        })).then(resolved => {
+            this.playlist = resolved;
+            this.playlistIndex = Math.max(0, startIdx);
+            this._updatePlaylistUI();
+            if (this.playlist.length > this.playlistIndex) {
+                const track = this.playlist[this.playlistIndex];
+                this.loadTrack(track.url, track);
+            }
+        });
     },
 
     _renderPlaylists() {
