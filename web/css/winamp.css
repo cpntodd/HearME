@@ -132,9 +132,13 @@ html, body {
     height: 22px;
     background: var(--bg-panel);
     padding: 0 4px;
-    gap: 2px;
+    gap: 0;
     flex-shrink: 0;
     border-bottom: 1px solid var(--chrome-shadow);
+}
+
+.menu-dropdown {
+    position: relative;
 }
 
 .menu-item {
@@ -143,11 +147,60 @@ html, body {
     color: var(--text);
     cursor: pointer;
     border-radius: 0;
+    background: none;
+    border: none;
+    font-family: var(--font-ui);
+    height: 20px;
+    line-height: 18px;
 }
 
-.menu-item:hover {
+.menu-item:hover,
+.menu-dropdown.open > .menu-item {
     background: var(--titlebar-active-start);
     color: #fff;
+}
+
+.menu-dropdown-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 180px;
+    background: var(--bg-panel);
+    border: 2px solid;
+    border-color: var(--border-raised-outer) var(--border-raised-inner-dark) var(--border-raised-inner-dark) var(--border-raised-outer);
+    box-shadow: 2px 2px 4px rgba(0,0,0,0.6);
+    z-index: 1000;
+    padding: 2px;
+}
+
+.menu-dropdown.open > .menu-dropdown-content {
+    display: block;
+}
+
+.menu-dropdown-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 3px 20px 3px 8px;
+    font-size: 11px;
+    color: var(--text);
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-family: var(--font-ui);
+    white-space: nowrap;
+}
+
+.menu-dropdown-item:hover {
+    background: var(--titlebar-active-start);
+    color: #fff;
+}
+
+.menu-dropdown-sep {
+    height: 1px;
+    background: var(--chrome-shadow);
+    margin: 2px 4px;
 }
 
 /* --- Tab Bar --- */

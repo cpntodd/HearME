@@ -14,6 +14,7 @@ const App = {
         this._bindSettings();
         this._bindAppearance();
         this._bindTitlebar();
+        this._bindMenus();
         this._bindNodeClick();
         this._bindNodeDelete();
         this._bindContextMenu();
@@ -1041,6 +1042,103 @@ const App = {
                 document.exitFullscreen();
             }
         });
+    },
+
+    _bindMenus() {
+        // --- Dropdown toggle: click menu button to open/close ---
+        document.querySelectorAll('.menu-dropdown > .menu-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const dropdown = btn.parentElement;
+                const wasOpen = dropdown.classList.contains('open');
+                // Close all dropdowns
+                document.querySelectorAll('.menu-dropdown.open').forEach(d => d.classList.remove('open'));
+                // Toggle this one
+                if (!wasOpen) dropdown.classList.add('open');
+            });
+        });
+
+        // --- Click a dropdown item executes action ---
+        document.querySelectorAll('.menu-dropdown-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Close all dropdowns
+                document.querySelectorAll('.menu-dropdown.open').forEach(d => d.classList.remove('open'));
+                const action = item.dataset.action;
+                this._handleMenuAction(action);
+            });
+        });
+
+        // --- Click anywhere outside closes dropdowns ---
+        document.addEventListener('click', () => {
+            document.querySelectorAll('.menu-dropdown.open').forEach(d => d.classList.remove('open'));
+        });
+
+        // --- About dialog ---
+        document.getElementById('about-close').addEventListener('click', () => {
+            document.getElementById('about-overlay').classList.add('hidden');
+        });
+        document.getElementById('about-ok').addEventListener('click', () => {
+            document.getElementById('about-overlay').classList.add('hidden');
+        });
+        document.getElementById('about-overlay').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('about-overlay')) {
+                document.getElementById('about-overlay').classList.add('hidden');
+            }
+        });
+    },
+
+    _handleMenuAction(action) {
+        const settings = Store.getSettings();
+        switch (action) {
+            // --- File ---
+            case 'export':
+                document.getElementById('btn-export-artists').click();
+                break;
+            case 'import':
+                document.getElementById('btn-import-artists').click();
+                break;
+            case 'exit':
+                if (confirm('Close HearME?')) window.close();
+                break;
+
+            // --- View: Tab switching ---
+            case 'tab-player':
+                document.querySelector('button[data-tab="player"]').click();
+                break;
+            case 'tab-graph':
+                document.querySelector('button[data-tab="graph"]').click();
+                break;
+            case 'tab-tours':
+                document.querySelector('button[data-tab="tours"]').click();
+                break;
+            case 'tab-settings':
+                document.querySelector('button[data-tab="settings"]').click();
+                break;
+
+            // --- View: Zoom ---
+            case 'zoom-in': {
+                const z = Math.min(2.0, (settings.uiZoom || 1.0) + 0.1);
+                this._setZoom(Math.round(z * 10) / 10);
+                break;
+            }
+            case 'zoom-out': {
+                const z = Math.max(0.8, (settings.uiZoom || 1.0) - 0.1);
+                this._setZoom(Math.round(z * 10) / 10);
+                break;
+            }
+            case 'zoom-reset':
+                this._setZoom(1.0);
+                break;
+
+            // --- Help ---
+            case 'about':
+                document.getElementById('about-overlay').classList.remove('hidden');
+                break;
+            case 'github':
+                window.open('https://github.com/cpntodd/HearME', '_blank');
+                break;
+        }
     },
 
     // --- State Persistence ---

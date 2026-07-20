@@ -462,7 +462,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 				"lastfm":       s.cfg.LastFMAPIKey != "",
 			},
 			"jellyfin": map[string]any{
-				"url":   s.cfg.JellyfinURL,
+				"url":    s.cfg.JellyfinURL,
 				"hasKey": s.cfg.JellyfinAPIKey != "",
 			},
 			"scraper": map[string]any{

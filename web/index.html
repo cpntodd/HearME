@@ -22,9 +22,35 @@
 
         <!-- Menu Bar -->
         <div class="menubar">
-            <span class="menu-item">File</span>
-            <span class="menu-item">View</span>
-            <span class="menu-item">Help</span>
+            <div class="menu-dropdown" id="menu-file">
+                <button class="menu-item">File</button>
+                <div class="menu-dropdown-content">
+                    <button class="menu-dropdown-item" data-action="export">📤 Export Artists</button>
+                    <button class="menu-dropdown-item" data-action="import">📥 Import Artists</button>
+                    <div class="menu-dropdown-sep"></div>
+                    <button class="menu-dropdown-item" data-action="exit">✕ Exit</button>
+                </div>
+            </div>
+            <div class="menu-dropdown" id="menu-view">
+                <button class="menu-item">View</button>
+                <div class="menu-dropdown-content">
+                    <button class="menu-dropdown-item" data-action="tab-player">🎧 Player</button>
+                    <button class="menu-dropdown-item" data-action="tab-graph">🕸️ Graph Explorer</button>
+                    <button class="menu-dropdown-item" data-action="tab-tours">🎫 Tour Grid</button>
+                    <button class="menu-dropdown-item" data-action="tab-settings">⚙️ Settings</button>
+                    <div class="menu-dropdown-sep"></div>
+                    <button class="menu-dropdown-item" data-action="zoom-in">🔍 Zoom In</button>
+                    <button class="menu-dropdown-item" data-action="zoom-out">🔎 Zoom Out</button>
+                    <button class="menu-dropdown-item" data-action="zoom-reset">↺ Reset Zoom</button>
+                </div>
+            </div>
+            <div class="menu-dropdown" id="menu-help">
+                <button class="menu-item">Help</button>
+                <div class="menu-dropdown-content">
+                    <button class="menu-dropdown-item" data-action="about">ℹ️ About HearME</button>
+                    <button class="menu-dropdown-item" data-action="github">🌐 GitHub Repository</button>
+                </div>
+            </div>
         </div>
 
         <!-- Tab Bar -->
@@ -356,6 +382,39 @@
             </div>
             <div class="dialog-footer">
                 <button id="dialog-cancel" class="btn">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- About Dialog -->
+    <div class="dialog-overlay hidden" id="about-overlay">
+        <div class="dialog window" style="width:380px">
+            <div class="titlebar">
+                <span class="titlebar-text">About HearME</span>
+                <button class="titlebar-btn titlebar-btn-close" id="about-close">✕</button>
+            </div>
+            <div class="dialog-body" style="text-align:center;padding:16px">
+                <div style="font-size:28px;margin-bottom:4px">🎵</div>
+                <div style="font-size:16px;font-weight:bold;color:var(--green);margin-bottom:2px">HearME v0.1.0</div>
+                <div style="font-size:11px;color:var(--text-secondary);margin-bottom:12px">Your music. Their tours. One binary.</div>
+                <div style="font-size:11px;color:var(--text);line-height:1.6">
+                    A self-contained music discovery app.<br>
+                    Explore artist graphs, browse tours,<br>
+                    and stream your Jellyfin library —<br>
+                    all from a single static binary.
+                </div>
+                <div style="margin-top:12px;font-size:10px;color:var(--text-dim)">
+                    Author: <span style="color:var(--text-secondary)">cpntodd</span><br>
+                    License: <span style="color:var(--text-secondary)">AGPL-3.0</span><br>
+                    <a href="https://github.com/cpntodd/HearME" target="_blank" style="color:var(--green)">github.com/cpntodd/HearME</a>
+                </div>
+                <div style="margin-top:12px;font-size:9px;color:var(--text-dim)">
+                    Built with Go · MusicBrainz · Last.fm<br>
+                    Bandsintown · Lyrics.ovh · Cover Art Archive
+                </div>
+            </div>
+            <div class="dialog-footer">
+                <button id="about-ok" class="btn">OK</button>
             </div>
         </div>
     </div>
