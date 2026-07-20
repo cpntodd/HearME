@@ -1576,28 +1576,17 @@ html, body {
     cursor: context-menu;
 }
 
-/* --- VU + VFD --- */
-.player-displays {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    justify-content: center;
-    flex-shrink: 0;
-}
-
+/* --- VFD display (left panel, standalone) --- */
 .player-vfd {
     background: #0a1a0a;
     border: 1px solid var(--chrome-dark);
     image-rendering: pixelated;
-    height: 36px;
+    width: 100%;
+    flex-shrink: 0;
 }
 
-.player-vu {
-    background: #0a0a0a;
-    border: 1px solid var(--chrome-dark);
-}
-
-/* --- Lyrics --- */
+/* ================================================================
+   Equalizer
 .player-lyrics {
     flex: 1;
     overflow-y: auto;
@@ -1982,12 +1971,32 @@ html, body {
     height: 18px;
 }
 
+.player-eq-body {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+}
+
 .player-eq-bands {
     display: flex;
     gap: 2px;
     align-items: flex-end;
     height: 80px;
     justify-content: center;
+    flex: 1;
+}
+
+.player-eq-vu {
+    display: flex;
+    gap: 3px;
+    align-items: flex-end;
+    flex-shrink: 0;
+    padding: 0 2px;
+}
+
+.player-vu {
+    background: #0a0a0a;
+    border: 1px solid var(--chrome-dark);
 }
 
 .player-eq-band {

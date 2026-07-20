@@ -79,12 +79,8 @@
                         </div>
                         <!-- Compact Visualizer -->
                         <canvas id="player-visualizer" class="player-visualizer"></canvas>
-                        <!-- VU + VFD display row -->
-                        <div class="player-displays">
-                            <canvas id="player-vfd" class="player-vfd" width="240" height="40"></canvas>
-                            <canvas id="player-vu-left" class="player-vu" width="30" height="60"></canvas>
-                            <canvas id="player-vu-right" class="player-vu" width="30" height="60"></canvas>
-                        </div>
+                        <!-- VFD display -->
+                        <canvas id="player-vfd" class="player-vfd" width="240" height="36"></canvas>
                         <!-- Togglable Lyrics -->
                         <div id="player-lyrics" class="player-lyrics hidden">
                             <div id="player-lyrics-text">Lyrics will appear here...</div>
@@ -163,7 +159,13 @@
                         </select>
                         <button id="btn-eq-toggle" class="player-ctrl-btn" title="Toggle EQ">🎚</button>
                     </div>
-                    <div class="player-eq-bands" id="player-eq-bands"></div>
+                    <div class="player-eq-body">
+                        <div class="player-eq-bands" id="player-eq-bands"></div>
+                        <div class="player-eq-vu">
+                            <canvas id="player-vu-left" class="player-vu" width="36" height="80"></canvas>
+                            <canvas id="player-vu-right" class="player-vu" width="36" height="80"></canvas>
+                        </div>
+                    </div>
                     <!-- Visualizer context menu -->
                     <div id="visualizer-context-menu" class="context-menu hidden">
                         <div class="context-menu-item" data-preset="spectrum">Spectrum</div>

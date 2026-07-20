@@ -76,8 +76,8 @@ const Player = {
             this._applyEQPreset(e.target.value);
         });
         document.getElementById('btn-eq-toggle').addEventListener('click', () => {
-            const bands = document.getElementById('player-eq-bands');
-            bands.style.display = bands.style.display === 'none' ? 'flex' : 'none';
+            const body = document.querySelector('.player-eq-body');
+            body.style.display = body.style.display === 'none' ? 'flex' : 'none';
         });
 
         // Visualizer context menu (right-click on visualizer canvas)
