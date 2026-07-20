@@ -15,6 +15,10 @@ const Player = {
     repeat: 'off', // 'off', 'one', 'all'
     preset: 'spectrum',
     animFrame: null,
+    _seeking: false,
+    _vol: 0.8,
+    _balance: 0,
+    _eqGains: [0,0,0,0,0,0,0,0,0,0],
 
     // VFD state
     vfdText: 'HEARME  READY',
@@ -110,9 +114,13 @@ const Player = {
             audioEl.addEventListener('loadedmetadata', () => {
                 document.getElementById('player-seek').max = Math.floor(audioEl.duration);
                 document.getElementById('player-time-total').textContent = this._fmtTime(audioEl.duration);
+                // Metadata display
+                this._updateMetaDisplay(audioEl);
             });
             audioEl.addEventListener('timeupdate', () => {
-                document.getElementById('player-seek').value = Math.floor(audioEl.currentTime);
+                if (!this._seeking) {
+                    document.getElementById('player-seek').value = Math.floor(audioEl.currentTime);
+                }
                 document.getElementById('player-time-current').textContent = this._fmtTime(audioEl.currentTime);
             });
             audioEl.addEventListener('ended', () => this._onEnded());
@@ -498,5 +506,138 @@ const Player = {
         const m = Math.floor(secs / 60);
         const s = Math.floor(secs % 60);
         return m + ':' + (s < 10 ? '0' : '') + s;
+    },
+
+    // --- Metadata display ---
+    _updateMetaDisplay(audioEl) {
+        // Try to get bitrate from the audio element or MediaSource
+        let kbps = '—';
+        let kHz = '—';
+        if (audioEl.audioTracks && audioEl.audioTracks.length > 0) {
+            // Not widely supported
+        }
+        // Use webkitAudioDecodedByteCount as a rough measure
+        if (audioEl.duration && audioEl.duration > 0) {
+            // Bitrate estimate from file size isn't available via JS
+        }
+        // If we have a web audio context, we can check sample rate
+        if (this.audioCtx) {
+            kHz = (this.audioCtx.sampleRate / 1000).toFixed(1);
+        }
+        document.getElementById('player-meta-info').textContent =
+            `${kbps} kbps · ${kHz} kHz`;
+    },
+
+    // --- Balance ---
+    _applyBalance() {
+        // Balance is applied via a stereo panner if available, otherwise gain split
+        if (!this.audioCtx) return;
+        if (!this._panner) {
+            this._panner = this.audioCtx.createStereoPanner();
+        }
+        this._panner.pan.value = this._balance || 0;
+    },
+
+    // --- Equalizer ---
+    _eqBands: [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000],
+    _eqGains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    _eqFilters: [],
+
+    _buildEQ() {
+        const container = document.getElementById('player-eq-bands');
+        container.innerHTML = '';
+        this._eqBands.forEach((freq, i) => {
+            const band = document.createElement('div');
+            band.className = 'player-eq-band';
+            const val = document.createElement('span');
+            val.className = 'player-eq-val';
+            val.textContent = '0dB';
+            const slider = document.createElement('input');
+            slider.type = 'range';
+            slider.className = 'player-eq-slider';
+            slider.min = -12;
+            slider.max = 12;
+            slider.value = 0;
+            slider.step = 1;
+            slider.title = freq >= 1000 ? (freq/1000)+'kHz' : freq+'Hz';
+            slider.addEventListener('input', () => {
+                this._eqGains[i] = parseInt(slider.value);
+                val.textContent = (this._eqGains[i] > 0 ? '+' : '') + this._eqGains[i] + 'dB';
+                document.getElementById('player-eq-preset').value = '';
+                this._updateEQFilters();
+            });
+            const label = document.createElement('span');
+            label.className = 'player-eq-label';
+            label.textContent = freq >= 1000 ? (freq/1000)+'k' : freq;
+            band.appendChild(val);
+            band.appendChild(slider);
+            band.appendChild(label);
+            container.appendChild(band);
+        });
+    },
+
+    _updateEQFilters() {
+        if (!this.audioCtx) return;
+        // Remove old filters
+        this._eqFilters.forEach(f => { try { f.disconnect(); } catch(e) {} });
+        this._eqFilters = [];
+
+        if (this._eqGains.every(g => g === 0)) return; // no EQ applied
+
+        // Rebuild audio graph with EQ: source -> eq filters -> analyser -> gain
+        if (this.sourceNode && this.analyser && this.gainNode) {
+            // Disconnect source
+            this.sourceNode.disconnect();
+            this.splitter && this.sourceNode.disconnect();
+
+            let prevNode = this.sourceNode;
+            this._eqBands.forEach((freq, i) => {
+                const filter = this.audioCtx.createBiquadFilter();
+                filter.type = 'peaking';
+                filter.frequency.value = freq;
+                filter.Q.value = 1.0;
+                filter.gain.value = this._eqGains[i];
+                prevNode.connect(filter);
+                prevNode = filter;
+                this._eqFilters.push(filter);
+            });
+
+            // Connect through EQ to analyser and gain
+            prevNode.connect(this.analyser);
+            this.analyser.connect(this.gainNode);
+            // Reconnect splitter
+            if (this.splitter) {
+                prevNode.connect(this.splitter);
+                this.splitter.connect(this.analyserL, 0);
+                this.splitter.connect(this.analyserR, 1);
+            }
+        }
+    },
+
+    _applyEQPreset(preset) {
+        const presets = {
+            rock:       [5, 4, 2, 0, -2, -1, 2, 4, 5, 5],
+            pop:        [-1, 0, 2, 4, 3, 0, -1, -1, 0, 0],
+            classical:  [5, 4, 3, 1, -1, -2, 0, 1, 3, 5],
+            jazz:       [4, 3, 1, 1, 0, 0, 1, 2, 3, 3],
+            electronic: [6, 5, 0, -2, -4, 0, 2, 4, 5, 5],
+            hiphop:     [5, 5, 3, 0, 0, 1, 2, 3, 3, 3],
+            metal:      [5, 5, 2, -2, -3, 0, 3, 5, 5, 5],
+            flat:       [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vocal:      [-2, -2, -1, 2, 5, 3, 1, 0, -1, -2],
+            bass:       [6, 6, 5, 3, 1, 0, 0, 0, 0, 0],
+        };
+
+        const gains = presets[preset];
+        if (!gains) return;
+
+        this._eqGains = gains;
+        const sliders = document.querySelectorAll('.player-eq-slider');
+        const vals = document.querySelectorAll('.player-eq-val');
+        gains.forEach((g, i) => {
+            if (sliders[i]) sliders[i].value = g;
+            if (vals[i]) vals[i].textContent = (g > 0 ? '+' : '') + g + 'dB';
+        });
+        this._updateEQFilters();
     },
 };

@@ -19,32 +19,44 @@ import (
 	"github.com/hearme/app/internal/lyrics"
 	"github.com/hearme/app/internal/models"
 	"github.com/hearme/app/internal/provider/artists"
+	"github.com/hearme/app/internal/provider/jellyfin"
 	"github.com/hearme/app/internal/provider/tours"
 	"github.com/hearme/app/internal/scraper"
 )
 
 // Server wraps the HTTP server and application state.
 type Server struct {
-	cfg     *config.Config
-	http    *http.Server
-	Cache   *cache.Cache
-	artists *artists.Aggregator
-	tours   *tours.Aggregator
-	scraper *scraper.Engine
-	lyrics  *lyrics.Provider
-	mu      sync.Mutex // protects provider reconfiguration
+	cfg      *config.Config
+	http     *http.Server
+	Cache    *cache.Cache
+	artists  *artists.Aggregator
+	tours    *tours.Aggregator
+	scraper  *scraper.Engine
+	lyrics   *lyrics.Provider
+	jellyfin *jellyfin.Client
+	mu       sync.Mutex // protects provider reconfiguration
 }
 
 // New creates a new Server. webFS is the embedded frontend filesystem passed from main.
 func New(cfg *config.Config, webFS fs.FS, artistAgg *artists.Aggregator, tourAgg *tours.Aggregator) *Server {
 	c := cache.New(1 * time.Hour)
 	s := &Server{
-		cfg:     cfg,
-		Cache:   c,
-		artists: artistAgg,
-		tours:   tourAgg,
-		scraper: scraper.New(cfg, c),
-		lyrics:  lyrics.New("lyricsovh", ""),
+		cfg:      cfg,
+		Cache:    c,
+		artists:  artistAgg,
+		tours:    tourAgg,
+		scraper:  scraper.New(cfg, c),
+		lyrics:   lyrics.New("lyricsovh", ""),
+		jellyfin: jellyfin.NewClient(cfg.JellyfinURL, cfg.JellyfinAPIKey),
+	}
+
+	// Init Jellyfin client if configured
+	if s.jellyfin.Enabled() {
+		if _, err := s.jellyfin.GetUserID(); err != nil {
+			log.Printf("jellyfin: auth failed: %v", err)
+		} else {
+			log.Printf("jellyfin: connected to %s", cfg.JellyfinURL)
+		}
 	}
 
 	mux := http.NewServeMux()
@@ -62,6 +74,9 @@ func New(cfg *config.Config, webFS fs.FS, artistAgg *artists.Aggregator, tourAgg
 	mux.HandleFunc("/api/scraper/tours/", s.handleScraperTours)
 	mux.HandleFunc("/api/settings", s.handleSettings)
 	mux.HandleFunc("/api/cache/clear", s.handleCacheClear)
+	mux.HandleFunc("/api/jellyfin/search", s.handleJellyfinSearch)
+	mux.HandleFunc("/api/jellyfin/stream/", s.handleJellyfinStream)
+	mux.HandleFunc("/api/jellyfin/status", s.handleJellyfinStatus)
 
 	// Static file server for embedded frontend
 	mux.Handle("/", http.FileServer(http.FS(webFS)))
@@ -562,6 +577,84 @@ func (s *Server) reconfigureProviders() {
 	log.Printf("reconfiguring providers with updated API keys")
 	s.artists = artists.NewAggregator(s.cfg)
 	s.tours = tours.NewAggregator(s.cfg)
+	s.jellyfin = jellyfin.NewClient(s.cfg.JellyfinURL, s.cfg.JellyfinAPIKey)
+	if s.jellyfin.Enabled() {
+		if _, err := s.jellyfin.GetUserID(); err != nil {
+			log.Printf("jellyfin: auth failed after reconfig: %v", err)
+		}
+	}
+}
+
+// --- Jellyfin handlers ---
+
+func (s *Server) handleJellyfinStatus(w http.ResponseWriter, r *http.Request) {
+	if !s.jellyfin.Enabled() {
+		s.writeJSON(w, http.StatusOK, map[string]any{"connected": false, "message": "Jellyfin not configured"})
+		return
+	}
+	id, err := s.jellyfin.GetUserID()
+	if err != nil {
+		s.writeJSON(w, http.StatusOK, map[string]any{"connected": false, "message": err.Error()})
+		return
+	}
+	s.writeJSON(w, http.StatusOK, map[string]any{"connected": true, "userId": id})
+}
+
+func (s *Server) handleJellyfinSearch(w http.ResponseWriter, r *http.Request) {
+	if !s.jellyfin.Enabled() {
+		s.writeJSONError(w, http.StatusServiceUnavailable, "Jellyfin not configured")
+		return
+	}
+	q := r.URL.Query().Get("q")
+	if q == "" {
+		s.writeJSONError(w, http.StatusBadRequest, "query parameter 'q' required")
+		return
+	}
+	items, err := s.jellyfin.Search(q)
+	if err != nil {
+		s.writeJSONError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	type result struct {
+		ID       string `json:"id"`
+		Title    string `json:"title"`
+		Artist   string `json:"artist"`
+		Album    string `json:"album"`
+		Duration int    `json:"duration"` // seconds
+		ImageURL string `json:"imageUrl,omitempty"`
+	}
+	results := make([]result, 0, len(items))
+	for _, item := range items {
+		dur := int(item.RunTimeTicks / 10000000) // ticks to seconds
+		artist := item.AlbumArtist
+		if artist == "" && len(item.Artists) > 0 {
+			artist = item.Artists[0]
+		}
+		imgURL := ""
+		if len(item.ImageTags) > 0 {
+			imgURL = s.jellyfin.ImageURL(item.AlbumID)
+		}
+		results = append(results, result{
+			ID: item.ID, Title: item.Name, Artist: artist,
+			Album: item.Album, Duration: dur, ImageURL: imgURL,
+		})
+	}
+	s.writeJSON(w, http.StatusOK, results)
+}
+
+func (s *Server) handleJellyfinStream(w http.ResponseWriter, r *http.Request) {
+	if !s.jellyfin.Enabled() {
+		s.writeJSONError(w, http.StatusServiceUnavailable, "Jellyfin not configured")
+		return
+	}
+	// Path: /api/jellyfin/stream/{itemId}
+	itemID := strings.TrimPrefix(r.URL.Path, "/api/jellyfin/stream/")
+	if itemID == "" {
+		s.writeJSONError(w, http.StatusBadRequest, "item ID required")
+		return
+	}
+	streamURL := s.jellyfin.StreamURL(itemID)
+	http.Redirect(w, r, streamURL, http.StatusTemporaryRedirect)
 }
 
 // --- JSON helpers ---

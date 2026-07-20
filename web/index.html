@@ -108,10 +108,11 @@
                 <!-- Transport Controls -->
                 <div class="player-transport">
                     <div class="player-controls-left">
-                        <button id="btn-shuffle" class="player-ctrl-btn" title="Shuffle">🔀</button>
+                        <button id="btn-stop" class="player-ctrl-btn" title="Stop">⏹</button>
                         <button id="btn-prev" class="player-ctrl-btn" title="Previous">⏮</button>
                         <button id="btn-play" class="player-ctrl-btn player-ctrl-play" title="Play/Pause">▶</button>
                         <button id="btn-next" class="player-ctrl-btn" title="Next">⏭</button>
+                        <button id="btn-shuffle" class="player-ctrl-btn" title="Shuffle">🔀</button>
                         <button id="btn-repeat" class="player-ctrl-btn" title="Repeat">🔁</button>
                     </div>
                     <div class="player-seek-container">
@@ -120,9 +121,35 @@
                         <span id="player-time-total" class="player-time">0:00</span>
                     </div>
                     <div class="player-controls-right">
+                        <span class="player-time" title="Track info" id="player-meta-info" style="font-size:10px;min-width:80px;text-align:right">— kbps · — kHz</span>
                         <span class="player-time">🔊</span>
                         <input type="range" id="player-volume" class="player-volume" min="0" max="100" value="80">
-                        <button id="btn-eq" class="player-ctrl-btn" title="Equalizer">🎚</button>
+                        <span class="player-time" style="font-size:9px">L</span>
+                        <input type="range" id="player-balance" class="player-volume" min="-100" max="100" value="0" title="Balance">
+                        <span class="player-time" style="font-size:9px">R</span>
+                    </div>
+                </div>
+                <!-- Equalizer -->
+                <div class="player-eq" id="player-eq">
+                    <div class="player-eq-header">
+                        <span class="player-eq-title">EQUALIZER</span>
+                        <select id="player-eq-preset" class="player-eq-preset">
+                            <option value="">Manual</option>
+                            <option value="rock">Rock</option>
+                            <option value="pop">Pop</option>
+                            <option value="classical">Classical</option>
+                            <option value="jazz">Jazz</option>
+                            <option value="electronic">Electronic</option>
+                            <option value="hiphop">Hip Hop</option>
+                            <option value="metal">Metal</option>
+                            <option value="flat">Flat</option>
+                            <option value="vocal">Vocal Boost</option>
+                            <option value="bass">Bass Boost</option>
+                        </select>
+                        <button id="btn-eq-toggle" class="player-ctrl-btn" title="Toggle EQ">🎚</button>
+                    </div>
+                    <div class="player-eq-bands" id="player-eq-bands">
+                        <!-- 10 bands: 31, 62, 125, 250, 500, 1k, 2k, 4k, 8k, 16k -->
                     </div>
                 </div>
             </div>
