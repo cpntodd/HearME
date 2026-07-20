@@ -322,6 +322,16 @@ const App = {
         document.getElementById('btn-import-library').addEventListener('click', () => {
             this._importFromLibrary();
         });
+
+        // Export graph
+        document.getElementById('btn-export-png').addEventListener('click', () => {
+            Graph.exportPNG();
+            Components.toast('Graph exported as PNG.', 'info');
+        });
+        document.getElementById('btn-export-csv').addEventListener('click', () => {
+            Graph.exportCSV();
+            Components.toast('Graph exported as CSV (nodes + edges).', 'info');
+        });
     },
 
     async _importFromLibrary() {
@@ -337,31 +347,29 @@ const App = {
                 return;
             }
             let imported = 0;
+            const newlyImported = [];
             for (const artist of data) {
-                if (Graph.nodes.length >= Graph.maxNodes) {
-                    Components.toast(`Node limit reached (${Graph.maxNodes}). Imported ${imported} artists.`, 'warn');
+                if (Graph.nodes.length >= Graph._getMaxNodes()) {
+                    Components.toast(`Node limit reached. Imported ${imported} artists.`, 'warn');
                     break;
                 }
                 const exists = Graph.nodes.find(n =>
                     n.artist.name.toLowerCase() === artist.name.toLowerCase()
                 );
                 if (!exists) {
+                    // Default showInTours to false — tour tracking is explicit, not a side effect of importing
                     Graph.addNode(artist);
-                    Store.addArtist(artist);
+                    Store.addArtist({ ...artist, showInTours: false });
+                    newlyImported.push(artist);
                     imported++;
                 }
             }
             if (imported > 0) {
                 this._updateArtistList();
-                Components.toast(`Imported ${imported} artists from library.`, 'info');
-                // Auto-expand based on user setting (default 5)
-                const batchSize = parseInt(Store.getSettings().autoExpandCount || 5);
-                const toExpand = Graph.nodes.filter(n => !n.expanded).slice(0, batchSize);
-                for (const node of toExpand) {
-                    await this._expandArtist(node.artist);
-                }
-                // Refresh tour grid with library artists
-                if (Grid && Grid.refresh) Grid.refresh();
+                Components.toast(`Imported ${imported} artists from library. Auto-expanding...`, 'info');
+                // Lazy-expand ALL imported nodes in staggered batches to build the interconnected web.
+                // This creates edges between owned artists when MusicBrainz/Last.fm reports a relationship.
+                this._lazyExpandQueue(newlyImported, 0);
             } else {
                 Components.toast('All library artists already in graph.', 'info');
             }
@@ -371,6 +379,28 @@ const App = {
             btn.textContent = orig;
             btn.disabled = false;
         }
+    },
+
+    // Staggered expansion: processes one node every ~300ms to avoid hammering the API.
+    // Each expansion populates related artists, including links to other owned artists,
+    // building a fully interconnected web of pinnable/movable nodes.
+    _lazyExpandQueue(artists, idx) {
+        if (idx >= artists.length) {
+            document.getElementById('status-text').textContent =
+                `Imported ${artists.length} artists. Graph expansion complete.`;
+            if (Grid && Grid.refresh) Grid.refresh();
+            return;
+        }
+        const artist = artists[idx];
+        document.getElementById('status-text').textContent =
+            `Expanding ${idx + 1}/${artists.length}: "${artist.name}"...`;
+        this._expandArtist(artist).then(() => {
+            // Schedule next expansion after a short delay
+            setTimeout(() => this._lazyExpandQueue(artists, idx + 1), 300);
+        }).catch(() => {
+            // Even on error, continue to next
+            setTimeout(() => this._lazyExpandQueue(artists, idx + 1), 300);
+        });
     },
 
     _bindDetailPanel() {

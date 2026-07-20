@@ -682,4 +682,78 @@ const Graph = {
     resetView() {
         this.transform = { x: 0, y: 0, scale: 1 };
     },
+
+    // --- Export ---
+
+    // Export the current canvas as a PNG file download.
+    exportPNG() {
+        // Render one frame without UI decorations (the canvas already only has the graph)
+        // Force a render frame to ensure content is on canvas
+        this._render();
+        const dataURL = this.canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = dataURL;
+        a.download = 'hearme_graph_' + new Date().toISOString().slice(0, 10) + '.png';
+        a.click();
+    },
+
+    // Export nodes and edges as CSV (two files: nodes.csv + edges.csv).
+    exportCSV() {
+        // Nodes CSV
+        let nodesCSV = 'id,name,genres,popularity,pinned,expanded,x,y\n';
+        for (const node of this.nodes) {
+            const genres = (node.artist.genres || []).join('; ');
+            nodesCSV += [
+                this._csvEscape(node.id),
+                this._csvEscape(node.artist.name),
+                this._csvEscape(genres),
+                node.artist.popularity || 0,
+                node.pinned ? 'yes' : 'no',
+                node.expanded ? 'yes' : 'no',
+                Math.round(node.x),
+                Math.round(node.y),
+            ].join(',') + '\n';
+        }
+
+        // Edges CSV
+        let edgesCSV = 'source_id,source_name,target_id,target_name,type\n';
+        for (const edge of this.edges) {
+            const src = this.nodes.find(n => n.id === edge.source);
+            const tgt = this.nodes.find(n => n.id === edge.target);
+            edgesCSV += [
+                this._csvEscape(edge.source),
+                this._csvEscape(src ? src.artist.name : ''),
+                this._csvEscape(edge.target),
+                this._csvEscape(tgt ? tgt.artist.name : ''),
+                this._csvEscape(edge.type || 'similar'),
+            ].join(',') + '\n';
+        }
+
+        const blob = new Blob([nodesCSV], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'hearme_nodes_' + new Date().toISOString().slice(0, 10) + '.csv';
+        a.click();
+        URL.revokeObjectURL(url);
+
+        // Small delay between downloads to avoid browser blocking
+        setTimeout(() => {
+            const blob2 = new Blob([edgesCSV], { type: 'text/csv' });
+            const url2 = URL.createObjectURL(blob2);
+            const a2 = document.createElement('a');
+            a2.href = url2;
+            a2.download = 'hearme_edges_' + new Date().toISOString().slice(0, 10) + '.csv';
+            a2.click();
+            URL.revokeObjectURL(url2);
+        }, 200);
+    },
+
+    _csvEscape(val) {
+        const s = String(val || '');
+        if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+            return '"' + s.replace(/"/g, '""') + '"';
+        }
+        return s;
+    },
 };
