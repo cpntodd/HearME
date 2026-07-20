@@ -28,13 +28,13 @@ const Graph = {
     attraction: 0.01,
     idealEdgeLength: 120,
     damping: 0.85,
-    centerGravity: 0.003,       // pull toward viewport center (only when enabled)
-    centerGravityEnabled: false, // toggle via settings — default OFF so nodes don't clump
-    orbitGravity: 0.008,        // pull connected nodes toward pinned hosts
-    orbitIdealDist: 100,        // ideal orbital distance from pinned node
+    centerGravity: 0.003,        // pull toward viewport center (only when enabled)
+    centerGravityEnabled: true,  // toggle via settings — keeps nodes from drifting off-screen
+    orbitGravity: 0.008,         // pull connected nodes toward pinned hosts
+    orbitIdealDist: 100,         // ideal orbital distance from pinned node
     maxVelocity: 10,
-    dragScale: 1.15,            // scale up when dragging
-    wiggleTime: 0,              // for edge wiggle animation
+    dragScale: 1.15,             // scale up when dragging
+    wiggleTime: 0,               // for edge wiggle animation
 
     // Genre color map
     genreColors: {},
@@ -254,7 +254,10 @@ const Graph = {
                 const dx = nodes[j].x - nodes[i].x;
                 const dy = nodes[j].y - nodes[i].y;
                 const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                const force = this.repulsion / (dist * dist);
+                // Scale repulsion down for large graphs so nodes don't explode outward.
+                // For 50 nodes: scale=1.0; for 200 nodes: scale=0.5.
+                const repScale = Math.min(1, Math.sqrt(50 / Math.max(1, n)));
+                const force = this.repulsion * repScale / (dist * dist);
                 const fx = (dx / dist) * force;
                 const fy = (dy / dist) * force;
                 if (!nodes[i].pinned) { nodes[i].vx -= fx; nodes[i].vy -= fy; }
@@ -521,7 +524,8 @@ const Graph = {
         if (hit) {
             this.dragNode = hit;
             this.dragOffset = { x: world.x - hit.x, y: world.y - hit.y };
-            this.dragStartPos = { x: hit.x, y: hit.y }; // track start for click detection
+            // Track mouse screen position for click-vs-drag detection (more reliable than node position)
+            this._mouseDownPos = { x: e.clientX, y: e.clientY };
             this.canvas.style.cursor = 'grabbing';
         } else {
             this.isPanning = true;
@@ -556,10 +560,11 @@ const Graph = {
 
     _onMouseUp(e) {
         if (this.dragNode) {
-            // Detect click vs drag by checking if position changed significantly
-            const dx = Math.abs(this.dragNode.x - (this.dragStartPos?.x || this.dragNode.x));
-            const dy = Math.abs(this.dragNode.y - (this.dragStartPos?.y || this.dragNode.y));
-            const wasClick = dx < 3 && dy < 3; // less than 3px movement = click
+            // Detect click vs drag by comparing mouse screen position (reliable even if
+            // _onMouseMove fired and moved the node). 5px threshold for a real click.
+            const mdx = Math.abs(e.clientX - (this._mouseDownPos?.x || e.clientX));
+            const mdy = Math.abs(e.clientY - (this._mouseDownPos?.y || e.clientY));
+            const wasClick = mdx < 5 && mdy < 5;
 
             // Only pin if actually dragged (moved more than a click)
             if (!wasClick) {
@@ -568,15 +573,12 @@ const Graph = {
             this.dragNode.vx = 0;
             this.dragNode.vy = 0;
             const node = this.dragNode;
-            this.dragStartPos = null;
+            this._mouseDownPos = null;
             this.dragNode = null;
             this.canvas.style.cursor = this.hoverNode ? 'pointer' : 'grab';
 
             if (wasClick && this._onNodeClick) {
-                const rect = this.canvas.getBoundingClientRect();
-                const world = this._screenToWorld(e.clientX - rect.left, e.clientY - rect.top);
-                const hit = this._hitTest(world.x, world.y);
-                if (hit) this._onNodeClick(hit);
+                this._onNodeClick(node);
             }
         }
         this.isPanning = false;

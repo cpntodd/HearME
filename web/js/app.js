@@ -1234,7 +1234,7 @@ const App = {
         document.getElementById('setting-max-nodes').value = s.maxGraphNodes || 500;
         document.getElementById('setting-auto-expand').value = s.autoExpandCount || 5;
         const cg = document.getElementById('setting-center-gravity');
-        cg.checked = s.centerGravity === true;
+        cg.checked = s.centerGravity !== false; // default ON
         Graph.centerGravityEnabled = cg.checked;
     },
 
