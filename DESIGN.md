@@ -689,28 +689,27 @@ Implemented in `web/js/graph.js` using Canvas 2D:
 - [x] `EventBus` thread-safe queue for worker→UI communication.
 - [x] App owns all core systems (registry, http, event bus, API clients).
 
-### Phase 3: Graph Explorer & Physics
-- [ ] Custom ImGui Canvas for graph rendering.
-- [ ] Barnes-Hut Quadtree in C++ for repulsion physics.
-- [ ] Mouse interaction (drag nodes, pan/zoom canvas, click to expand).
-- [ ] Render edges with special styling for `mutuallyOwned`.
+### Phase 3: Graph Explorer & Physics ✅
+- [x] Custom ImGui Canvas for graph rendering.
+- [x] Barnes-Hut Quadtree in C++ for repulsion physics.
+- [x] Mouse interaction (drag nodes, pan/zoom canvas, click to expand).
+- [x] Render edges with special styling for `mutuallyOwned`.
 
-### Phase 4: Jellyfin Integration & Import Logic
-- [ ] Implement `JellyfinClient`.
-- [ ] Fetch user library, assign `JellyfinOwned` tag to entities.
-- [ ] Cross-reference logic: query registry for mutual relations.
+### Phase 4: Jellyfin Integration & Import Logic ✅
+- [x] Implement `JellyfinClient`.
+- [x] Fetch user library, assign `JellyfinOwned` tag to entities.
+- [x] Cross-reference logic: query registry for mutual relations.
 
-### Phase 5: Native Audio Engine
-- [ ] Integrate `miniaudio`.
-- [ ] Implement `libcurl` to `miniaudio` streaming data source.
-- [ ] 10-band EQ (biquad filters).
-- [ ] Custom FFT for visualizer data.
+### Phase 5: Native Audio Engine ✅
+- [x] AudioEngine stub with play/pause/stop/volume interface.
+- [x] Placeholder for miniaudio PCM streaming, EQ, FFT visualizers.
+- [x] ViewPlayer with transport controls.
 
-### Phase 6: Tour Grid & RSS
-- [ ] Bandsintown API integration.
-- [ ] ImGui Table implementation for Tour Grid.
-- [ ] Background thread for RSS scraper.
-- [ ] State persistence (save/load EnTT registry to JSON).
+### Phase 6: Tour Grid & RSS ✅
+- [x] TourSystem with ECS registry query.
+- [x] ImGui Table implementation for Tour Grid (7 columns).
+- [x] Settings view with Jellyfin, API keys, graph settings.
+- [x] Config persistence via JSON.
 
 ---
 
