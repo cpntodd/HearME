@@ -1,0 +1,30 @@
+# nfpm configuration for HearME native C++ .deb packaging
+name: hearme
+arch: amd64
+platform: linux
+version: 0.1.0
+section: sound
+priority: optional
+maintainer: cpntodd <cpntodd@github.com>
+description: |
+  HearME — Your music. Their tours. Native metal.
+  A self-contained native C++ music discovery and playback application
+  with Jellyfin integration, force-directed artist graph explorer,
+  tour grid, and Winamp-inspired audio player.
+  Built with SDL2, Dear ImGui, EnTT, and libcurl.
+depends:
+  - libsdl2-2.0-0
+  - libcurl4
+  - libglew2.2
+  - libstdc++6
+homepage: https://github.com/cpntodd/HearME
+license: AGPL-3.0
+
+contents:
+  - src: ./build/hearme
+    dst: /usr/bin/hearme
+  - src: ./hearme.desktop
+    dst: /usr/share/applications/hearme.desktop
+  - src: ./hearme.png
+    dst: /usr/share/icons/hicolor/256x256/apps/hearme.png
+    packager: deb
