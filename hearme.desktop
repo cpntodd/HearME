@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=HearME
+Comment=Your music. Their tours. One binary.
+Exec=hearme --open
+Icon=hearme
+Terminal=false
+Categories=Audio;AudioVideo;Player;
+Keywords=music;discovery;tours;jellyfin;player;

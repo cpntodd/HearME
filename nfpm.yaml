@@ -1,0 +1,27 @@
+# nfpm configuration for HearME .deb packaging
+# Build with: nfpm package -p deb
+name: hearme
+arch: amd64
+platform: linux
+version: 0.1.0
+section: sound
+priority: optional
+maintainer: cpntodd <cpntodd@github.com>
+description: |
+  HearME — Your music. Their tours. One binary.
+  A self-contained music discovery and playback application
+  with Jellyfin integration, force-directed artist graph explorer,
+  tour grid, and Winamp-inspired audio player with Web Audio API
+  visualizer, 10-band EQ, and VU meters.
+depends: []
+homepage: https://github.com/cpntodd/HearME
+license: AGPL-3.0
+
+contents:
+  - src: ./hearme
+    dst: /usr/bin/hearme
+  - src: ./hearme.desktop
+    dst: /usr/share/applications/hearme.desktop
+  - src: ./hearme.png
+    dst: /usr/share/icons/hicolor/256x256/apps/hearme.png
+    packager: deb

@@ -248,27 +248,66 @@ const Graph = {
         const n = nodes.length;
         if (n === 0) return;
 
-        // Repulsion between all node pairs (pinned nodes repel others but aren't moved)
+        // Scale repulsion down for large graphs.
+        const repScale = Math.min(1, Math.sqrt(50 / Math.max(1, n)));
+        const repulsion = this.repulsion * repScale;
+
+        // --- Spatial hash grid for O(n) repulsion ---
+        // Instead of O(n²) pairwise checks, each node only checks forces
+        // from nodes in the same or neighboring grid cells.
+        const CELL = 150; // grid cell size in world-space pixels
+        const grid = new Map();
+
         for (let i = 0; i < n; i++) {
-            for (let j = i + 1; j < n; j++) {
-                const dx = nodes[j].x - nodes[i].x;
-                const dy = nodes[j].y - nodes[i].y;
-                const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                // Scale repulsion down for large graphs so nodes don't explode outward.
-                // For 50 nodes: scale=1.0; for 200 nodes: scale=0.5.
-                const repScale = Math.min(1, Math.sqrt(50 / Math.max(1, n)));
-                const force = this.repulsion * repScale / (dist * dist);
-                const fx = (dx / dist) * force;
-                const fy = (dy / dist) * force;
-                if (!nodes[i].pinned) { nodes[i].vx -= fx; nodes[i].vy -= fy; }
-                if (!nodes[j].pinned) { nodes[j].vx += fx; nodes[j].vy += fy; }
+            const node = nodes[i];
+            const cx = Math.floor(node.x / CELL);
+            const cy = Math.floor(node.y / CELL);
+            const key = cx + ',' + cy;
+            let cell = grid.get(key);
+            if (!cell) { cell = []; grid.set(key, cell); }
+            cell.push(i); // store index for fast lookup
+        }
+
+        // Repulsion: only check within 3×3 neighborhood
+        for (let i = 0; i < n; i++) {
+            const node = nodes[i];
+            if (node.pinned) continue; // pinned nodes still repel others but aren't moved
+            const cx = Math.floor(node.x / CELL);
+            const cy = Math.floor(node.y / CELL);
+
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    const cell = grid.get((cx + dx) + ',' + (cy + dy));
+                    if (!cell) continue;
+                    for (let k = 0; k < cell.length; k++) {
+                        const j = cell[k];
+                        if (j <= i) continue; // avoid double-counting
+                        const other = nodes[j];
+                        const ddx = other.x - node.x;
+                        const ddy = other.y - node.y;
+                        const distSq = ddx * ddx + ddy * ddy;
+                        if (distSq < 1) continue;
+                        const dist = Math.sqrt(distSq);
+                        const force = repulsion / distSq;
+                        const fx = (ddx / dist) * force;
+                        const fy = (ddy / dist) * force;
+                        if (!node.pinned) { node.vx -= fx; node.vy -= fy; }
+                        if (!other.pinned) { other.vx += fx; other.vy += fy; }
+                    }
+                }
             }
+        }
+
+        // Build node lookup map for O(1) lookups in edge traversal
+        const nodeMap = new Map();
+        for (const node of nodes) {
+            nodeMap.set(node.id, node);
         }
 
         // Attraction along edges
         for (const edge of this.edges) {
-            const src = nodes.find(n => n.id === edge.source);
-            const tgt = nodes.find(n => n.id === edge.target);
+            const src = nodeMap.get(edge.source);
+            const tgt = nodeMap.get(edge.target);
             if (!src || !tgt) continue;
             const dx = tgt.x - src.x;
             const dy = tgt.y - src.y;
@@ -285,8 +324,8 @@ const Graph = {
             if (!node.pinned) continue;
             for (const edge of this.edges) {
                 let neighbor = null;
-                if (edge.source === node.id) neighbor = nodes.find(n => n.id === edge.target);
-                else if (edge.target === node.id) neighbor = nodes.find(n => n.id === edge.source);
+                if (edge.source === node.id) neighbor = nodeMap.get(edge.target);
+                else if (edge.target === node.id) neighbor = nodeMap.get(edge.source);
                 if (!neighbor || neighbor.pinned) continue;
 
                 const dx = node.x - neighbor.x;
@@ -347,11 +386,34 @@ const Graph = {
         ctx.translate(this.transform.x, this.transform.y);
         ctx.scale(this.transform.scale, this.transform.scale);
 
-        // Draw edges
+        // Compute visible world-space rectangle (with margin for labels)
+        const margin = 50;
+        const vx1 = -this.transform.x / this.transform.scale - margin;
+        const vy1 = -this.transform.y / this.transform.scale - margin;
+        const vx2 = (w - this.transform.x) / this.transform.scale + margin;
+        const vy2 = (h - this.transform.y) / this.transform.scale + margin;
+
+        // Build a Set of visible node IDs for edge culling
+        const visibleNodeIds = new Set();
+        for (const node of this.nodes) {
+            if (node.x >= vx1 && node.x <= vx2 && node.y >= vy1 && node.y <= vy2) {
+                visibleNodeIds.add(node.id);
+            }
+        }
+
+        // Build node lookup map for O(1) edge endpoint resolution
+        const nodeMap = new Map();
+        for (const node of this.nodes) {
+            nodeMap.set(node.id, node);
+        }
+
+        // Draw edges (skip if both endpoints are off-screen)
         for (const edge of this.edges) {
-            const src = this.nodes.find(n => n.id === edge.source);
-            const tgt = this.nodes.find(n => n.id === edge.target);
+            const src = nodeMap.get(edge.source);
+            const tgt = nodeMap.get(edge.target);
             if (!src || !tgt) continue;
+            // Skip edges where both endpoints are far off-screen
+            if (!visibleNodeIds.has(src.id) && !visibleNodeIds.has(tgt.id)) continue;
 
             let sx = src.x, sy = src.y, tx = tgt.x, ty = tgt.y;
 
@@ -382,13 +444,16 @@ const Graph = {
             }
         }
 
-        // Draw nodes (sorted so selected nodes render on top, dragged node on very top)
+        // Draw nodes — sort so selected render on top, dragged on very top
         const sorted = [...this.nodes].sort((a, b) => {
             if (a === this.dragNode) return 1;
             if (b === this.dragNode) return -1;
             return (a.selected ? 1 : 0) - (b.selected ? 1 : 0);
         });
         for (const node of sorted) {
+            // Viewport cull: skip nodes completely outside visible area
+            if (!visibleNodeIds.has(node.id) && node !== this.dragNode) continue;
+
             const isDragging = node === this.dragNode;
             const scale = isDragging ? this.dragScale : 1;
             const r = node.radius * scale;
