@@ -21,3 +21,4 @@ native/
 # the Free Software Foundation, either version 3 of the License, or
 Thumbs.db
 .vscode/
+build/
