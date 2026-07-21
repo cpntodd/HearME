@@ -4,6 +4,7 @@ import (
 	"embed"
 	"io/fs"
 	"log"
+	"net"
 	"os"
 	"os/exec"
 	"time"
@@ -22,6 +23,15 @@ func main() {
 	config.LoadDotEnv(".env")
 
 	cfg := config.Load()
+
+	// Single-instance: if port is already in use, another instance is running.
+	// Just open the browser to it and exit (handles .desktop re-launch).
+	if !canBind(cfg.Addr()) {
+		url := "http://" + cfg.Addr()
+		log.Printf("another instance already running on %s, opening browser", cfg.Addr())
+		openBrowser(url)
+		os.Exit(0)
+	}
 
 	webFS, err := fs.Sub(webDir, "web")
 	if err != nil {
@@ -49,6 +59,16 @@ func main() {
 	if err := srv.Run(); err != nil {
 		log.Fatalf("server error: %v", err)
 	}
+}
+
+// canBind checks if the given address can be bound (port is free).
+func canBind(addr string) bool {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return false
+	}
+	ln.Close()
+	return true
 }
 
 // isDesktopLaunch returns true if the app was likely launched from a .desktop
