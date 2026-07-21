@@ -673,6 +673,47 @@ Implemented in `web/js/graph.js` using Canvas 2D:
 
 ---
 
+## Native C++ Port — Implementation Progress (Port branch)
+
+### Phase 1: C++ Skeleton & Native Window ✅
+- [x] CMake setup, link SDL2, Dear ImGui, EnTT, nlohmann/json, libcurl.
+- [x] `main.cpp` SDL2 initialization, ImGui context setup.
+- [x] Basic main loop (Event polling, ImGui frame start/end, SDL2 render).
+- [x] Winamp/Win9x ImGui theme implementation.
+- [x] Tab bar structure (Player, Graph, Tours, Settings).
+
+### Phase 2: ECS & Network Layer ✅
+- [x] Define EnTT components (`ArtistInfo`, `GraphNode`, `GraphEdge`, etc.).
+- [x] Implement `HttpClient` using `libcurl` with async worker thread.
+- [x] Implement MusicBrainz and Last.fm API clients.
+- [x] `EventBus` thread-safe queue for worker→UI communication.
+- [x] App owns all core systems (registry, http, event bus, API clients).
+
+### Phase 3: Graph Explorer & Physics
+- [ ] Custom ImGui Canvas for graph rendering.
+- [ ] Barnes-Hut Quadtree in C++ for repulsion physics.
+- [ ] Mouse interaction (drag nodes, pan/zoom canvas, click to expand).
+- [ ] Render edges with special styling for `mutuallyOwned`.
+
+### Phase 4: Jellyfin Integration & Import Logic
+- [ ] Implement `JellyfinClient`.
+- [ ] Fetch user library, assign `JellyfinOwned` tag to entities.
+- [ ] Cross-reference logic: query registry for mutual relations.
+
+### Phase 5: Native Audio Engine
+- [ ] Integrate `miniaudio`.
+- [ ] Implement `libcurl` to `miniaudio` streaming data source.
+- [ ] 10-band EQ (biquad filters).
+- [ ] Custom FFT for visualizer data.
+
+### Phase 6: Tour Grid & RSS
+- [ ] Bandsintown API integration.
+- [ ] ImGui Table implementation for Tour Grid.
+- [ ] Background thread for RSS scraper.
+- [ ] State persistence (save/load EnTT registry to JSON).
+
+---
+
 ## Resolved Design Decisions
 
 1. **Node graph performance:** Hard cap at 500 visible nodes. Display a retro-styled warning dialog when the cap is hit. Users can remove artists to free node slots.
