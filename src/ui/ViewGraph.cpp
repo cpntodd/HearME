@@ -14,6 +14,8 @@ extern App* g_app;
 static GraphSystem* g_graphSystem = nullptr;
 static float g_lastTime = 0;
 
+GraphSystem* getGraphSystem() { return g_graphSystem; }
+
 void ViewGraph::Draw() {
     if (!g_app) return;
 

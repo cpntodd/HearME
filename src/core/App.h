@@ -9,6 +9,7 @@ class HttpClient;
 class EventBus;
 class MusicBrainzClient;
 class LastfmClient;
+class JellyfinClient;
 
 struct AppConfig;
 
@@ -29,6 +30,7 @@ public:
     HttpClient& http() { return *m_httpClient; }
     MusicBrainzClient& musicbrainz() { return *m_mbClient; }
     LastfmClient& lastfm() { return *m_lfClient; }
+    JellyfinClient& jellyfin() { return *m_jfClient; }
     AppConfig& config() { return *m_config; }
 
 private:
@@ -49,5 +51,6 @@ private:
     std::unique_ptr<EventBus>          m_eventBus;
     std::unique_ptr<MusicBrainzClient> m_mbClient;
     std::unique_ptr<LastfmClient>      m_lfClient;
+    std::unique_ptr<JellyfinClient>    m_jfClient;
     entt::registry                     m_registry;
 };

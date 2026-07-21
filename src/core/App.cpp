@@ -6,6 +6,7 @@
 #include "network/HttpClient.h"
 #include "network/MusicBrainzClient.h"
 #include "network/LastfmClient.h"
+#include "network/JellyfinClient.h"
 #include "ui/Theme.h"
 #include "ui/ViewPlayer.h"
 #include "ui/ViewGraph.h"
@@ -70,6 +71,7 @@ bool App::init() {
     m_eventBus = std::make_unique<EventBus>();
     m_mbClient = std::make_unique<MusicBrainzClient>(*m_httpClient);
     m_lfClient = std::make_unique<LastfmClient>(*m_httpClient, m_config->lastfmApiKey);
+    m_jfClient = std::make_unique<JellyfinClient>(*m_httpClient, m_config->jellyfinUrl, m_config->jellyfinApiKey);
 
     // --- Dear ImGui ---
     IMGUI_CHECKVERSION();
@@ -120,6 +122,7 @@ void App::shutdown() {
     // Destroy core systems in reverse order
     m_lfClient.reset();
     m_mbClient.reset();
+    m_jfClient.reset();
     m_eventBus.reset();
     m_httpClient.reset();
     m_config.reset();

@@ -16,6 +16,11 @@ struct AppConfig {
     // Jellyfin
     std::string jellyfinUrl;
     std::string jellyfinApiKey;
+
+    // Graph settings
+    bool centerGravityEnabled = true;
+    float graphRepulsion = 5000.0f;
+    float graphDamping = 0.85f;
 };
 
 AppConfig loadConfig(const std::string& path = "");
