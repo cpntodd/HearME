@@ -2,6 +2,10 @@
 
 #include "core/App.h"
 #include "core/Config.h"
+#include "core/EventBus.h"
+#include "network/HttpClient.h"
+#include "network/MusicBrainzClient.h"
+#include "network/LastfmClient.h"
 #include "ui/Theme.h"
 #include "ui/ViewPlayer.h"
 #include "ui/ViewGraph.h"
@@ -17,6 +21,8 @@
 
 #include <stdexcept>
 #include <cstdio>
+
+App::App() = default;
 
 App::~App() {
     shutdown();
@@ -58,6 +64,13 @@ bool App::init() {
         return false;
     }
 
+    // --- Core Systems ---
+    m_config = std::make_unique<AppConfig>(loadConfig());
+    m_httpClient = std::make_unique<HttpClient>();
+    m_eventBus = std::make_unique<EventBus>();
+    m_mbClient = std::make_unique<MusicBrainzClient>(*m_httpClient);
+    m_lfClient = std::make_unique<LastfmClient>(*m_httpClient, m_config->lastfmApiKey);
+
     // --- Dear ImGui ---
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
@@ -82,6 +95,7 @@ bool App::init() {
 void App::run() {
     while (m_running) {
         processEvents();
+        processAppEvents();
         beginFrame();
 
         // Main menu bar — tabs
@@ -103,9 +117,24 @@ void App::shutdown() {
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
+    // Destroy core systems in reverse order
+    m_lfClient.reset();
+    m_mbClient.reset();
+    m_eventBus.reset();
+    m_httpClient.reset();
+    m_config.reset();
+
     if (m_glContext) { SDL_GL_DeleteContext(m_glContext); m_glContext = nullptr; }
     if (m_window)    { SDL_DestroyWindow(m_window); m_window = nullptr; }
     SDL_Quit();
+}
+
+void App::processAppEvents() {
+    AppEvent ev;
+    while (m_eventBus->poll(ev)) {
+        // Events will be processed by individual systems in later phases
+        (void)ev;
+    }
 }
 
 void App::processEvents() {
