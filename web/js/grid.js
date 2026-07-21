@@ -47,21 +47,33 @@ const Grid = {
         statusEl.textContent = 'Fetching tours...';
 
         // Get artists marked "show in tours"
-        const artists = Store.getArtists().filter(a => a.showInTours);
+        const artists = Store.getArtists().filter(a => a.showInTours !== false);
         if (artists.length === 0) {
             this.tours = [];
             this.render();
-            statusEl.textContent = 'No artists selected for tours.';
+            statusEl.textContent = 'No artists selected for tours. Use Graph Explorer → Add All to Tour Grid.';
             return;
         }
 
         const names = artists.map(a => a.name);
         try {
             const data = await API.getTours(names);
+            if (!data || data.length === 0) {
+                // Check if any tour providers are configured
+                const settings = Store.getSettings();
+                const hasTourKeys = settings.bandsintownKey || settings.songkickKey || settings.ticketmasterKey;
+                if (!hasTourKeys) {
+                    statusEl.textContent = 'No tour API keys configured. Add keys in Settings → API Keys.';
+                } else {
+                    statusEl.textContent = 'No upcoming tours found for selected artists.';
+                }
+            } else {
+                this.tours = data;
+                Store.setCachedTours(this.tours);
+                document.getElementById('tour-offline-warning').classList.add('hidden');
+                statusEl.textContent = `Loaded ${this.tours.length} tours.`;
+            }
             this.tours = data || [];
-            Store.setCachedTours(this.tours);
-            document.getElementById('tour-offline-warning').classList.add('hidden');
-            statusEl.textContent = `Loaded ${this.tours.length} tours.`;
         } catch (err) {
             // Fall back to cached data
             const cached = Store.getCachedTours();
@@ -117,7 +129,20 @@ const Grid = {
         // Render table
         const tbody = document.getElementById('tour-table-body');
         if (filtered.length === 0) {
-            tbody.innerHTML = `<tr class="tour-empty"><td colspan="8">No tours to display. Select artists in the Graph Explorer and check "Show in Tour Grid".</td></tr>`;
+            const artists = Store.getArtists().filter(a => a.showInTours !== false);
+            let msg;
+            if (artists.length === 0) {
+                msg = 'No artists selected for tours. Go to Graph Explorer → Actions → "Add All to Tour Grid".';
+            } else {
+                const settings = Store.getSettings();
+                const hasKeys = settings.bandsintownKey || settings.songkickKey || settings.ticketmasterKey;
+                if (!hasKeys) {
+                    msg = `No tour API keys configured. Add Bandsintown/Songkick/Ticketmaster keys in Settings → API Keys. (${artists.length} artist(s) ready)`;
+                } else {
+                    msg = `No upcoming tours found for ${artists.length} selected artist(s). Try refreshing later.`;
+                }
+            }
+            tbody.innerHTML = `<tr class="tour-empty"><td colspan="8">${msg}</td></tr>`;
         } else {
             tbody.innerHTML = filtered.map(t => {
                 const owned = (typeof App !== 'undefined' && App.isArtistOwned && App.isArtistOwned(t.artistName))

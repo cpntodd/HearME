@@ -88,6 +88,11 @@ const App = {
             });
         }
 
+        // Auto-refresh tour grid when switching to that tab
+        if (name === 'tours') {
+            Grid.refresh();
+        }
+
         document.getElementById('status-text').textContent =
             name === 'graph' ? 'Graph Explorer' :
             name === 'tours' ? 'Tour Grid' :
