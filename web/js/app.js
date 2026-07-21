@@ -332,6 +332,37 @@ const App = {
             Graph.exportCSV();
             Components.toast('Graph exported as CSV (nodes + edges).', 'info');
         });
+
+        // Add all graph nodes to tour grid
+        document.getElementById('btn-add-all-tours').addEventListener('click', () => {
+            this._addAllToTourGrid();
+        });
+    },
+
+    _addAllToTourGrid() {
+        const artists = Store.getArtists();
+        if (artists.length === 0) {
+            Components.toast('No artists in graph. Import or add some first.', 'info');
+            return;
+        }
+        let count = 0;
+        for (const a of artists) {
+            if (!a.showInTours) {
+                a.showInTours = true;
+                count++;
+            }
+        }
+        if (count > 0) {
+            Store.setArtists(artists);
+            this._updateArtistList();
+            if (Grid && Grid.refresh) Grid.refresh();
+        }
+        Components.toast(
+            count > 0
+                ? `Added ${count} artist(s) to tour grid.`
+                : `All ${artists.length} artists already in tour grid.`,
+            'info'
+        );
     },
 
     async _importFromLibrary() {
